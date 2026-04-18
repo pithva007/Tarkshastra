@@ -134,187 +134,51 @@ manager = ConnectionManager()
 # Prevents duplicate calls for same alert
 called_alert_ids: set = set()
 
+# ── Import new simulator ─────────────────────────────────────────────────────
+from simulator import get_simulator
+
 # ── Corridor simulator state ──────────────────────────────────────────────────
 CORRIDORS = ["Ambaji", "Dwarka", "Somnath", "Pavagadh"]
-
-_PHASE_OFFSETS = {
-    "Ambaji":   0.0,
-    "Dwarka":   math.pi * 0.5,
-    "Somnath":  math.pi * 1.0,
-    "Pavagadh": math.pi * 1.5,
-}
-
-_sim_step: Dict[str, int] = {c: 0 for c in CORRIDORS}
-_active_alerts: Dict[str, Optional[str]] = {c: None for c in CORRIDORS}
-_consecutive_high: Dict[str, int] = {c: 0 for c in CORRIDORS}
 _bus_tick = 0
 
-
-def _generate_reading(corridor: str) -> dict:
-    step = _sim_step[corridor]
-    _sim_step[corridor] += 1
-
-    phase_offset = _PHASE_OFFSETS[corridor]
-    sine_val = math.sin((step * 0.021) + phase_offset)
-    base_cpi = 0.575 + sine_val * 0.275
-    noise = random.uniform(-0.04, 0.04)
-    base_cpi = max(0.25, min(0.95, base_cpi + noise))
-
-    flow_rate = random.uniform(800, 1800)
-    transport_burst = random.uniform(0.2, 0.8)
-    chokepoint_density = random.uniform(0.3, 0.9)
-
-    cpi = (flow_rate / 2000) * 0.5 + transport_burst * 0.3 + chokepoint_density * 0.2
-    cpi = round(max(0.25, min(0.95, cpi)), 3)
-
-    if cpi > 0.70:
-        _consecutive_high[corridor] += 1
-    else:
-        _consecutive_high[corridor] = 0
-
-    if _consecutive_high[corridor] >= 3 and cpi > 0.70:
-        surge_type = "GENUINE_CRUSH"
-    elif cpi >= 0.55:
-        surge_type = "SELF_RESOLVING"
-    else:
-        surge_type = "SAFE"
-
-    alert_active = surge_type == "GENUINE_CRUSH"
-    if alert_active:
-        if _active_alerts[corridor] is None:
-            ts = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
-            _active_alerts[corridor] = f"ALT_{ts}_{corridor[:3].upper()}"
-    else:
-        _active_alerts[corridor] = None
-
-    alert_id = _active_alerts[corridor]
-
-    if cpi < 0.85 and cpi >= 0.40:
-        slope = 0.008 + (cpi - 0.40) * 0.02
-        ttb_s = int((0.85 - cpi) / slope)
-    elif cpi >= 0.85:
-        ttb_s = 0
-    else:
-        ttb_s = None
-
-    ml_confidence = min(99, max(50, int(50 + cpi * 50)))
-    ml_risk_level = (
-        "CRITICAL" if cpi >= 0.85 else
-        "HIGH"     if cpi >= 0.70 else
-        "MEDIUM"   if cpi >= 0.50 else
-        "LOW"
-    )
-
-    # Keep bus simulator in sync with corridor CPI
-    update_destination_cpi(corridor, cpi)
-
-    return {
-        "type":                   "cpi_update",
-        "corridor":               corridor,
-        "cpi":                    cpi,
-        "flow_rate":              round(flow_rate, 1),
-        "transport_burst":        round(transport_burst, 3),
-        "chokepoint_density":     round(chokepoint_density, 3),
-        "surge_type":             surge_type,
-        "time_to_breach_seconds": ttb_s,
-        "time_to_breach_minutes": round(ttb_s / 60, 1) if ttb_s is not None else None,
-        "alert_active":           alert_active,
-        "alert_id":               alert_id,
-        "ml_confidence":          ml_confidence,
-        "ml_risk_level":          ml_risk_level,
-        "timestamp":              datetime.now(timezone.utc).isoformat(),
-    }
+# Get the singleton simulator instance
+simulator = get_simulator()
 
 
-# ── Background simulator task ─────────────────────────────────────────────────
-async def run_simulator():
-    global _bus_tick
-    print("[simulator] Loop started — broadcasting every 2s")
-    while True:
-        try:
-            for corridor in CORRIDORS:
-                try:
-                    reading = _generate_reading(corridor)
-
-                    try:
-                        await log_cpi(
-                            corridor=reading["corridor"],
-                            cpi=reading["cpi"],
-                            flow_rate=reading["flow_rate"],
-                            transport_burst=reading["transport_burst"],
-                            chokepoint_density=reading["chokepoint_density"],
-                            surge_type=reading["surge_type"],
-                            alert_fired=reading["alert_active"],
-                        )
-                    except Exception as db_err:
-                        print(f"[simulator] DB log error ({corridor}): {db_err}")
-
-                    if reading["alert_active"] and reading["alert_id"]:
-                        try:
-                            await insert_alert(
-                                alert_id=reading["alert_id"],
-                                corridor=reading["corridor"],
-                                cpi=reading["cpi"],
-                                surge_type=reading["surge_type"],
-                                ml_confidence=reading.get("ml_confidence"),
-                            )
-                        except Exception:
-                            pass
-
-                    await manager.broadcast(reading)
-                    print(f"[sim] {corridor}: CPI={reading['cpi']} {reading['surge_type']}")
-
-                    # === PHONE CALL TRIGGER ===
-                    if (
-                        reading.get("alert_active")
-                        and reading.get("surge_type") == "GENUINE_CRUSH"
-                        and reading.get("cpi", 0) >= 0.85
-                        and reading.get("alert_id") not in called_alert_ids
-                    ):
-                        called_alert_ids.add(reading["alert_id"])
-                        print(
-                            f"[CALLS] Triggering calls for {corridor} "
-                            f"alert {reading['alert_id']}"
-                        )
-                        asyncio.create_task(
-                            trigger_calls_and_log(
-                                corridor=corridor,
-                                cpi=reading["cpi"],
-                                ttb_minutes=reading.get("time_to_breach_minutes") or 0,
-                                surge_type=reading["surge_type"],
-                                alert_id=reading["alert_id"],
-                                flow_rate=reading.get("flow_rate", 1200),
-                                transport_burst=reading.get("transport_burst", 0.6),
-                                chokepoint_density=reading.get("chokepoint_density", 0.7),
-                                ml_confidence=reading.get("ml_confidence", 85)
-                            )
-                        )
-
-                except Exception as corridor_err:
-                    print(f"[simulator] Error for {corridor}: {corridor_err}")
-                    continue
-
-            # Broadcast bus positions every 5 seconds (every 2-3 CPI cycles)
-            _bus_tick += 1
-            if _bus_tick % 3 == 0:
-                try:
-                    bus_msg = get_bus_update_message(_bus_tick)
-                    await manager.broadcast(bus_msg)
-                except Exception as bus_err:
-                    print(f"[simulator] Bus update error: {bus_err}")
-
-        except Exception as loop_err:
-            print(f"[simulator] Outer loop error: {loop_err}")
-
-        await asyncio.sleep(2)
-
+async def handle_new_alert(data: dict):
+    """Called when corridor transitions to SURGE alert."""
+    alert_id = data["alert_id"]
+    
+    # Prevent duplicate handling
+    if alert_id in called_alert_ids:
+        return
+    called_alert_ids.add(alert_id)
+    
+    # Generate PDF + make calls in background
+    asyncio.create_task(trigger_calls_and_log(
+        corridor=data["corridor"],
+        cpi=data["cpi"],
+        ttb_minutes=data["time_to_breach_minutes"],
+        surge_type=data["surge_type"],
+        alert_id=alert_id,
+        flow_rate=data["flow_rate"],
+        transport_burst=data["transport_burst"],
+        chokepoint_density=data["chokepoint_density"],
+        ml_confidence=data["ml_confidence"]
+    ))
 
 # ── Lifecycle ─────────────────────────────────────────────────────────────────
 @app.on_event("startup")
 async def startup():
-    print("=== Backend starting up ===")
+    print("=== Backend starting ===")
     await init_db()
-    asyncio.create_task(run_simulator())
+    
+    # Initialize simulator with CSV
+    simulator.initialize("TS-PS11.csv")
+    simulator.set_broadcast(manager.broadcast)
+    simulator.set_alert_callback(handle_new_alert)
+    asyncio.create_task(simulator.run())
+    
     print("=== Simulator started ===")
     if _ML_AVAILABLE:
         try:
