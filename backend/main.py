@@ -188,6 +188,7 @@ async def startup():
     
     # Start bus simulator
     asyncio.create_task(run_bus_simulator())
+    print("=== Bus Simulator started ===")
     
     print("=== Simulator started ===")
     if _ML_AVAILABLE:
@@ -197,29 +198,30 @@ async def startup():
             print("[main] ML models not yet trained — run `python -m ml.train`")
 
 async def run_bus_simulator():
-    """Background task to update and broadcast bus positions every 5 seconds."""
+    """Broadcast bus positions every 5 seconds."""
+    print("[BUS] Simulator task started")
     while True:
         try:
-            # Get current CPI data for bus alert status
-            cpi_data = {}
-            for corridor in CORRIDORS:
-                if corridor in simulator.corridor_data:
-                    cpi_data[corridor] = simulator.corridor_data[corridor].get('cpi', 0)
-            
-            # Update bus positions
-            bus_data = bus_simulator.update(cpi_data)
-            
-            # Broadcast to all connected clients
-            await manager.broadcast({
-                "type": "bus_update",
-                "buses": bus_data,
-                "timestamp": datetime.utcnow().isoformat()
-            })
-            
+            bus_message = get_bus_update_message()
+            buses = bus_message.get("buses", [])
+            if buses:
+                await manager.broadcast(bus_message)
+                # Uncomment to debug:
+                # print(f"[BUS] Broadcast {len(buses)} buses")
         except Exception as e:
-            print(f"[BUS ERROR] {e}")
-        
+            print(f"[BUS BROADCAST ERROR] {e}")
         await asyncio.sleep(5)
+
+
+@app.get("/api/buses")
+async def get_buses():
+    """Debug endpoint — returns current bus positions."""
+    try:
+        msg = get_bus_update_message()
+        return {"count": len(msg.get("buses", [])),
+                "buses": msg.get("buses", [])}
+    except Exception as e:
+        return {"error": str(e), "count": 0}
 
 
 # ── Health ────────────────────────────────────────────────────────────────────
