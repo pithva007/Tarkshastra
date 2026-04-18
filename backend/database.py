@@ -1,7 +1,7 @@
 """
 SQLite schema and async helpers for TS-11 Stampede Predictor.
 
-Two tables:
+Tables:
   alerts  — one row per fired alert, tracks 3-agency ack times
   cpi_log — rolling 10-minute CPI readings (pruned automatically)
 """
@@ -23,7 +23,8 @@ async def init_db():
                 surge_type  TEXT    NOT NULL DEFAULT 'UNKNOWN',
                 police_ack  TEXT,
                 temple_ack  TEXT,
-                gsrtc_ack   TEXT
+                gsrtc_ack   TEXT,
+                ml_confidence REAL  DEFAULT NULL
             )
         """)
         await db.execute("""
@@ -39,17 +40,29 @@ async def init_db():
                 logged_at       TEXT NOT NULL
             )
         """)
+        # Migration: add ml_confidence column if it doesn't exist yet
+        try:
+            await db.execute("ALTER TABLE alerts ADD COLUMN ml_confidence REAL DEFAULT NULL")
+        except Exception:
+            pass
         await db.commit()
 
 
 # ── Alert table ───────────────────────────────────────────────────────────────
 
-async def insert_alert(alert_id: str, corridor: str, cpi: float, surge_type: str) -> int:
+async def insert_alert(
+    alert_id: str,
+    corridor: str,
+    cpi: float,
+    surge_type: str,
+    ml_confidence: float | None = None,
+) -> int:
     async with aiosqlite.connect(DB_PATH) as db:
         cur = await db.execute(
-            """INSERT OR IGNORE INTO alerts (alert_id, corridor, cpi, fired_at, surge_type)
-               VALUES (?, ?, ?, ?, ?)""",
-            (alert_id, corridor, round(cpi, 4), _now(), surge_type),
+            """INSERT OR IGNORE INTO alerts
+               (alert_id, corridor, cpi, fired_at, surge_type, ml_confidence)
+               VALUES (?, ?, ?, ?, ?, ?)""",
+            (alert_id, corridor, round(cpi, 4), _now(), surge_type, ml_confidence),
         )
         await db.commit()
         return cur.lastrowid or 0
@@ -76,6 +89,16 @@ async def get_alerts(limit: int = 50) -> list:
             "SELECT * FROM alerts ORDER BY id DESC LIMIT ?", (limit,)
         ) as cur:
             return [dict(r) for r in await cur.fetchall()]
+
+
+async def get_alert_by_id(alert_id: str) -> dict | None:
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute(
+            "SELECT * FROM alerts WHERE alert_id = ? LIMIT 1", (alert_id,)
+        ) as cur:
+            row = await cur.fetchone()
+            return dict(row) if row else None
 
 
 # ── CPI log ───────────────────────────────────────────────────────────────────

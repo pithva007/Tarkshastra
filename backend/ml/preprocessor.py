@@ -10,9 +10,14 @@ build_preprocessing_pipeline(df)  ->  (X_df, y_series, pipeline)
 apply_pipeline(pipeline, raw_df)  ->  np.ndarray
 load_pipeline(path)               ->  Pipeline
 save_pipeline(pipeline, path)
+load_and_clean(csv_path)          ->  pd.DataFrame
+normalize(df, scaler)             ->  np.ndarray
 LABEL_MAP                         ->  {str: int}
 LABEL_NAMES                       ->  {int: str}
 TEMPORAL_SHIFT_MINUTES            ->  int  (10)
+SIMPLE_FEATURES                   ->  list[str]
+SIMPLE_LABEL_MAP                  ->  {str: int}
+SIMPLE_LABEL_NAMES                ->  {int: str}
 """
 
 from __future__ import annotations
@@ -40,6 +45,31 @@ LABEL_NAMES: dict[int, str] = {
     2: "HIGH_RISK",
 }
 
+# Simple model labels (matching simulator surge_type)
+SIMPLE_LABEL_MAP: dict[str, int] = {
+    "Low":      0,  # SAFE
+    "Moderate": 1,  # SELF_RESOLVING
+    "High":     2,  # GENUINE_CRUSH
+    "Critical": 2,  # GENUINE_CRUSH
+}
+
+SIMPLE_LABEL_NAMES: dict[int, str] = {
+    0: "SAFE",
+    1: "SELF_RESOLVING",
+    2: "GENUINE_CRUSH",
+}
+
+# Features for the simple RandomForest model
+SIMPLE_FEATURES: list[str] = [
+    "flow_rate",
+    "transport_burst",
+    "chokepoint_density",
+    "cpi_rolling_mean_5",
+    "cpi_slope",
+    "hour_of_day",
+    "day_type",
+]
+
 # Predict risk this many minutes ahead
 TEMPORAL_SHIFT_MINUTES: int = 10
 
@@ -62,6 +92,47 @@ _RAW_CATEGORICAL: list[str] = ["location", "weather"]
 FEATURE_COLS: list[str] = []
 
 
+# ── Data loading helpers ──────────────────────────────────────────────────────
+
+def load_and_clean(csv_path: str) -> pd.DataFrame:
+    """
+    Load raw CSV/Excel dataset, clean nulls and fix dtypes.
+    Returns a cleaned DataFrame ready for feature engineering.
+    """
+    try:
+        df = pd.read_excel(csv_path, engine="openpyxl")
+    except Exception:
+        df = pd.read_csv(csv_path)
+
+    # Drop fully-empty rows
+    df = df.dropna(how="all").reset_index(drop=True)
+
+    # Fill numeric NaNs with column medians
+    for col in _RAW_NUMERIC:
+        if col in df.columns:
+            df[col] = pd.to_numeric(df[col], errors="coerce")
+            df[col] = df[col].fillna(df[col].median())
+
+    # Fill categorical NaNs
+    for col in _RAW_CATEGORICAL:
+        if col in df.columns:
+            df[col] = df[col].fillna("Unknown")
+
+    # Ensure risk_level column is clean
+    if "risk_level" in df.columns:
+        df["risk_level"] = df["risk_level"].str.strip()
+
+    return df
+
+
+def normalize(df: pd.DataFrame, scaler: StandardScaler) -> np.ndarray:
+    """
+    Apply a fitted StandardScaler to a DataFrame and return scaled array.
+    Columns must match scaler's expected feature set.
+    """
+    return scaler.transform(df)
+
+
 # ── Feature engineering ───────────────────────────────────────────────────────
 
 def engineer_features(df: pd.DataFrame) -> pd.DataFrame:
@@ -69,7 +140,7 @@ def engineer_features(df: pd.DataFrame) -> pd.DataFrame:
     Apply all feature engineering to a DataFrame.
 
     New features vs v1:
-      flow_acceleration       — row-wise diff of entry_flow (renamed from delta_flow)
+      flow_acceleration       — row-wise diff of entry_flow
       transport_burst_indicator — binary flag: transport_arrival_burst > 0
       pressure_trend_slope    — slope of pressure_index over last 5 rows
       rolling_flow_3/5/10     — rolling mean of entry_flow
@@ -80,7 +151,6 @@ def engineer_features(df: pd.DataFrame) -> pd.DataFrame:
     """
     df = df.copy()
 
-    # ── Primary engineered features ───────────────────────────────────────────
     df["density"] = (
         df["entry_flow_rate_pax_per_min"]
         / df["corridor_width_m"].replace(0, 1)
@@ -90,24 +160,19 @@ def engineer_features(df: pd.DataFrame) -> pd.DataFrame:
         / (df["exit_flow_rate_pax_per_min"] + 1.0)
     )
 
-    # Rate of change of entry flow (acceleration)
     df["flow_acceleration"] = df["entry_flow_rate_pax_per_min"].diff().fillna(0.0)
 
-    # Binary transport burst indicator
     df["transport_burst_indicator"] = (
         df["transport_arrival_burst"] > 0
     ).astype(int)
 
-    # Pressure trend slope over last 5 rows (linear regression slope proxy)
     def _rolling_slope(series: pd.Series, window: int = 5) -> pd.Series:
-        """Approximate slope = (last - first) / window for a rolling window."""
         roll_last  = series.rolling(window=window, min_periods=2).apply(lambda x: x[-1])
         roll_first = series.rolling(window=window, min_periods=2).apply(lambda x: x[0])
         return ((roll_last - roll_first) / window).fillna(0.0)
 
     df["pressure_trend_slope"] = _rolling_slope(df["pressure_index"], window=5)
 
-    # ── Rolling averages (min_periods=1 for single-row inference) ─────────────
     for w in (3, 5, 10):
         df[f"rolling_flow_{w}"] = (
             df["entry_flow_rate_pax_per_min"]
@@ -119,6 +184,67 @@ def engineer_features(df: pd.DataFrame) -> pd.DataFrame:
     df["rolling_pressure_3"] = df["pressure_index"].rolling(window=3, min_periods=1).mean()
 
     return df
+
+
+def engineer_simple_features(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Build the simple feature set for the RandomForest model.
+    Maps raw CSV columns to SIMPLE_FEATURES.
+    """
+    df = df.copy()
+
+    # flow_rate
+    if "entry_flow_rate_pax_per_min" in df.columns:
+        df["flow_rate"] = df["entry_flow_rate_pax_per_min"]
+    elif "flow_rate" not in df.columns:
+        df["flow_rate"] = 100.0
+
+    # transport_burst
+    if "transport_arrival_burst" in df.columns:
+        df["transport_burst"] = df["transport_arrival_burst"]
+    elif "transport_burst" not in df.columns:
+        df["transport_burst"] = 0.2
+
+    # chokepoint_density (normalized 0-1)
+    if "queue_density_pax_per_m2" in df.columns:
+        df["chokepoint_density"] = (df["queue_density_pax_per_m2"] / 8.0).clip(0.0, 1.0)
+    elif "chokepoint_density" not in df.columns:
+        df["chokepoint_density"] = 0.3
+
+    # cpi proxy column
+    cpi_col = "pressure_index" if "pressure_index" in df.columns else "cpi"
+    if cpi_col not in df.columns:
+        df[cpi_col] = 30.0
+
+    # cpi_rolling_mean_5
+    df["cpi_rolling_mean_5"] = (
+        df[cpi_col].rolling(window=5, min_periods=1).mean() / 100.0
+    ).clip(0.0, 1.0)
+
+    # cpi_slope
+    def _slope(series, window=5):
+        rl = series.rolling(window=window, min_periods=2).apply(lambda x: x[-1])
+        rf = series.rolling(window=window, min_periods=2).apply(lambda x: x[0])
+        return ((rl - rf) / (window * 100.0)).fillna(0.0)
+
+    df["cpi_slope"] = _slope(df[cpi_col], window=5)
+
+    # hour_of_day
+    if "timestamp" in df.columns:
+        try:
+            df["hour_of_day"] = pd.to_datetime(df["timestamp"]).dt.hour
+        except Exception:
+            df["hour_of_day"] = 10
+    elif "hour_of_day" not in df.columns:
+        df["hour_of_day"] = 10
+
+    # day_type (festival_peak → 0/1)
+    if "festival_peak" in df.columns:
+        df["day_type"] = df["festival_peak"].astype(int)
+    elif "day_type" not in df.columns:
+        df["day_type"] = 0
+
+    return df[SIMPLE_FEATURES]
 
 
 def _get_feature_names(engineered_df: pd.DataFrame) -> list[str]:
@@ -148,9 +274,6 @@ def apply_temporal_shift(
     """
     Shift the target label forward by `shift` rows per location so the model
     learns: "given features at time t, predict risk at t + shift minutes."
-
-    Rows where the future label is unavailable (last `shift` rows per location)
-    are dropped to prevent NaN targets.
     """
     y_shifted = y.copy().astype(float)
 
@@ -161,7 +284,6 @@ def apply_temporal_shift(
     else:
         y_shifted = y.shift(-shift)
 
-    # Drop rows with NaN target
     valid = y_shifted.notna()
     df    = df[valid].reset_index(drop=True)
     y_out = y_shifted[valid].astype(int).reset_index(drop=True)
@@ -175,34 +297,16 @@ def build_preprocessing_pipeline(
     temporal_shift: bool = True,
 ) -> Tuple[pd.DataFrame, pd.Series, Pipeline]:
     """
-    Full offline preprocessing for training:
-      1. Sort by timestamp
-      2. Map risk_level labels
-      3. Apply temporal shift (predict t+10)
-      4. Engineer features
-      5. Fit ColumnTransformer (OrdinalEncoder + StandardScaler)
-
-    Parameters
-    ----------
-    df             : raw DataFrame loaded from TS-PS11.xlsx
-    temporal_shift : if True (default), shift labels by TEMPORAL_SHIFT_MINUTES
-
-    Returns
-    -------
-    X_df     : pd.DataFrame — feature columns (pre-transform, for pipeline.fit)
-    y        : pd.Series   — integer labels (0,1,2) aligned with X_df
-    pipeline : fitted sklearn Pipeline
+    Full offline preprocessing for XGBoost training.
+    Returns X_df, y, fitted sklearn Pipeline.
     """
     global FEATURE_COLS
 
-    # Sort chronologically so rolling features are correct
     if "timestamp" in df.columns:
         df = df.sort_values("timestamp").reset_index(drop=True)
 
-    # Map labels (before temporal shift so shift is applied to integers)
     y = df["risk_level"].map(LABEL_MAP).astype(int)
 
-    # Temporal shift: y at row i → risk at t+10
     if temporal_shift:
         df, y = apply_temporal_shift(df, y, shift=TEMPORAL_SHIFT_MINUTES)
         print(
@@ -210,14 +314,12 @@ def build_preprocessing_pipeline(
             f"Rows after drop: {len(df):,}"
         )
 
-    # Feature engineering
     fe_df = engineer_features(df)
 
     numeric_features     = _get_feature_names(fe_df)
     categorical_features = [c for c in _RAW_CATEGORICAL if c in fe_df.columns]
     FEATURE_COLS         = categorical_features + numeric_features
 
-    # ColumnTransformer: encode categoricals, scale numerics
     ct = ColumnTransformer(
         transformers=[
             (
@@ -240,19 +342,15 @@ def build_preprocessing_pipeline(
     pipeline = Pipeline(steps=[("preprocessor", ct)])
     pipeline.fit(fe_df[FEATURE_COLS])
 
-    # Attach metadata to pipeline for inference
-    pipeline.feature_cols        = FEATURE_COLS
-    pipeline.numeric_features    = numeric_features
+    pipeline.feature_cols         = FEATURE_COLS
+    pipeline.numeric_features     = numeric_features
     pipeline.categorical_features = categorical_features
 
     return fe_df[FEATURE_COLS], y, pipeline
 
 
 def apply_pipeline(pipeline: Pipeline, raw_df: pd.DataFrame) -> np.ndarray:
-    """
-    Apply a fitted pipeline to a new DataFrame (inference path).
-    Runs engineer_features automatically; missing columns filled with 0.
-    """
+    """Apply a fitted pipeline to a new DataFrame (inference path)."""
     fe_df = engineer_features(raw_df)
     feature_cols = getattr(pipeline, "feature_cols", [])
     for col in feature_cols:
@@ -279,10 +377,7 @@ def load_pipeline(path: str) -> Pipeline:
 # ── Single-row / sequence inference helpers ───────────────────────────────────
 
 def dict_to_dataframe(data_dict: dict) -> pd.DataFrame:
-    """
-    Convert a single JSON/dict payload into a one-row DataFrame.
-    Missing optional fields are filled with safe defaults.
-    """
+    """Convert a single JSON/dict payload into a one-row DataFrame."""
     defaults = {
         "location":                    "Ambaji",
         "corridor_width_m":            5,
@@ -297,17 +392,13 @@ def dict_to_dataframe(data_dict: dict) -> pd.DataFrame:
         "predicted_crush_window_min":  15,
     }
     row = {**defaults, **data_dict}
-    # Keep only recognised feature columns
     allowed = set(_RAW_NUMERIC + _RAW_CATEGORICAL)
     row = {k: v for k, v in row.items() if k in allowed}
     return pd.DataFrame([row])
 
 
 def sequence_to_dataframe(records: list[dict]) -> pd.DataFrame:
-    """
-    Convert a list of dicts (replay/historical sequence) into a DataFrame.
-    Rolling features will be computed across the full sequence.
-    """
+    """Convert a list of dicts (replay/historical) into a DataFrame."""
     defaults = {
         "location":                    "Ambaji",
         "corridor_width_m":            5,

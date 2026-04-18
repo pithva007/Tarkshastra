@@ -5,19 +5,21 @@ import {
   Tooltip, ReferenceLine, ResponsiveContainer,
 } from 'recharts'
 
-import { useWebSocket }  from './hooks/useWebSocket'
-import PressureGauge     from './components/PressureGauge'
-import AgencyPanel       from './components/AgencyPanel'
-import AlertBanner       from './components/AlertBanner'
-import ReplayMode        from './components/ReplayMode'
-import CorridorMap       from './components/CorridorMap'
-import EventLog          from './components/EventLog'
+import { useWebSocket }    from './hooks/useWebSocket'
+import PressureGauge       from './components/PressureGauge'
+import AgencyPanel         from './components/AgencyPanel'
+import AlertBanner         from './components/AlertBanner'
+import ReplayMode          from './components/ReplayMode'
+import CorridorMap         from './components/CorridorMap'
+import EventLog            from './components/EventLog'
+import WhatIfSimulator     from './components/WhatIfSimulator'
+import CorridorCompare     from './components/CorridorCompare'
 
 const API = import.meta.env.VITE_API_URL || 'http://localhost:8000'
 
 const CORRIDORS = ['Ambaji', 'Dwarka', 'Somnath', 'Pavagadh']
 const AGENCIES  = ['police', 'temple', 'gsrtc']
-const TABS      = ['Dashboard', 'Map', 'Replay', 'Events']
+const TABS      = ['Dashboard', 'Compare', 'Map', 'Replay', 'Events']
 const MAX_HIST  = 60
 
 const AGENCY_LABELS = { police: 'Police', temple: 'Temple Trust', gsrtc: 'GSRTC' }
@@ -36,26 +38,47 @@ const cpiRing = (v, selected) =>
     ? `ring-2 ${v > 0.70 ? 'ring-red-500' : v > 0.40 ? 'ring-amber-500' : 'ring-green-500'}`
     : ''
 
+// ── ML Confidence Badge ────────────────────────────────────────────────────────
+function ConfidenceBadge({ surgeType, confidence, riskLevel }) {
+  if (!surgeType || surgeType === 'NORMAL') return null
+  const label = surgeType === 'GENUINE_CRUSH'
+    ? 'GENUINE CRUSH'
+    : surgeType === 'SELF_RESOLVING'
+    ? 'SELF RESOLVING'
+    : surgeType.replace('_', ' ')
+  const style =
+    riskLevel === 'CRITICAL' ? 'bg-red-900 text-red-200 border-red-700' :
+    riskLevel === 'HIGH'     ? 'bg-orange-900 text-orange-200 border-orange-700' :
+    riskLevel === 'MEDIUM'   ? 'bg-amber-900 text-amber-200 border-amber-700' :
+                               'bg-green-900 text-green-200 border-green-700'
+  return (
+    <div className={`inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1 rounded-full border ${style}`}>
+      <span>{label}</span>
+      {confidence != null && (
+        <span className="opacity-75">· {confidence}% confident</span>
+      )}
+    </div>
+  )
+}
+
 // ── App ────────────────────────────────────────────────────────────────────────
 export default function App() {
-  const agency = param('agency')  // null | 'police' | 'temple' | 'gsrtc'
+  const agency = param('agency')
 
-  const [tab,        setTab]       = useState('Dashboard')
-  const [corridor,   setCorridor]  = useState('Ambaji')
-  const [backendOk,  setBackendOk] = useState(null)
-  const [readings,   setReadings]  = useState({})   // { corridorName: reading }
-  const [history,    setHistory]   = useState({})   // { corridorName: [{cpi,t}] }
+  const [tab,       setTab]      = useState('Dashboard')
+  const [corridor,  setCorridor] = useState('Ambaji')
+  const [backendOk, setBackendOk] = useState(null)
+  const [readings,  setReadings]  = useState({})
+  const [history,   setHistory]   = useState({})
 
   const { lastMessage, readyState } = useWebSocket()
 
-  // Wake backend (Render cold starts)
   useEffect(() => {
     axios.get(`${API}/health`)
       .then(() => setBackendOk(true))
       .catch(() => setBackendOk(false))
   }, [])
 
-  // Process WS frames
   useEffect(() => {
     if (!lastMessage) return
     const frames = lastMessage.type === 'cpi_batch'
@@ -80,8 +103,8 @@ export default function App() {
     })
   }, [lastMessage])
 
-  const current = readings[corridor] || null
-  const currentHist = history[corridor] || []
+  const current     = readings[corridor] || null
+  const currentHist = history[corridor]  || []
   const allReadings = Object.values(readings)
 
   const wsColor = readyState === 'open' ? 'bg-green-400' : readyState === 'connecting' ? 'bg-amber-400 animate-pulse' : 'bg-red-500'
@@ -90,7 +113,6 @@ export default function App() {
   return (
     <div className="min-h-screen bg-gray-950 text-white">
 
-      {/* Alert banner — fixed at top */}
       <AlertBanner readings={allReadings} />
 
       {/* ── Header ── */}
@@ -112,7 +134,6 @@ export default function App() {
           </div>
 
           <div className="flex items-center gap-3 flex-shrink-0 text-xs">
-            {/* Backend status */}
             <span className="hidden sm:flex items-center gap-1.5 text-gray-400">
               <span className={`w-2 h-2 rounded-full ${
                 backendOk === null ? 'bg-gray-400 animate-pulse' : backendOk ? 'bg-green-400' : 'bg-red-400'
@@ -120,13 +141,11 @@ export default function App() {
               {backendOk === null ? 'Waking…' : backendOk ? 'Backend OK' : 'Backend Down'}
             </span>
 
-            {/* WS status */}
             <span className="flex items-center gap-1.5 text-gray-400">
               <span className={`w-2 h-2 rounded-full ${wsColor}`} />
               {wsLabel}
             </span>
 
-            {/* Agency links */}
             {!agency && (
               <div className="hidden md:flex gap-1">
                 {AGENCIES.map((ag) => (
@@ -137,6 +156,14 @@ export default function App() {
                 ))}
               </div>
             )}
+
+            {/* Compare All shortcut */}
+            <button
+              onClick={() => setTab('Compare')}
+              className="hidden md:block px-2 py-1 rounded bg-indigo-900 hover:bg-indigo-800 text-indigo-300 text-xs transition-colors font-medium"
+            >
+              Compare All
+            </button>
           </div>
         </div>
 
@@ -158,11 +185,11 @@ export default function App() {
       {/* ── Main ── */}
       <main className="max-w-7xl mx-auto px-4 py-6 space-y-6">
 
-        {/* Corridor selector (not on Events tab) */}
-        {tab !== 'Events' && (
+        {/* Corridor selector (not on Events or Compare tab) */}
+        {tab !== 'Events' && tab !== 'Compare' && (
           <div className="flex gap-2 flex-wrap">
             {CORRIDORS.map((c) => {
-              const r = readings[c]
+              const r   = readings[c]
               const cpi = r?.cpi
               return (
                 <button key={c} onClick={() => setCorridor(c)}
@@ -195,7 +222,19 @@ export default function App() {
                 current?.cpi > 0.70 ? 'border-red-700' : current?.cpi > 0.40 ? 'border-amber-700' : 'border-gray-700'
               }`}>
                 <PressureGauge cpi={current?.cpi ?? 0} size={230} label={corridor} />
-                {current?.surge_type && current.surge_type !== 'NORMAL' && (
+
+                {/* ML Confidence badge */}
+                {current && (
+                  <div className="mt-3">
+                    <ConfidenceBadge
+                      surgeType={current.surge_type}
+                      confidence={current.ml_confidence}
+                      riskLevel={current.ml_risk_level}
+                    />
+                  </div>
+                )}
+
+                {current?.surge_type && current.surge_type !== 'NORMAL' && !current.ml_confidence && (
                   <SurgePill type={current.surge_type} />
                 )}
               </div>
@@ -224,16 +263,18 @@ export default function App() {
                   value={current?.chokepoint_density?.toFixed(3) ?? '—'}
                   sub="normalised 0–1"
                   accent={current?.chokepoint_density > 0.7 ? 'amber' : 'neutral'} />
-                <Metric label="CPI Slope"
-                  value={current?.time_to_breach_seconds != null
-                    ? `${current.time_to_breach_seconds < 720 ? '▲ Fast' : '↗ Rising'}`
-                    : current?.surge_type === 'SELF_RESOLVING' ? '▼ Falling' : '→ Stable'}
-                  sub={`Phase: ${current?.phase ?? 'normal'}`}
-                  accent={current?.time_to_breach_seconds != null && current.time_to_breach_seconds < 720 ? 'red' : 'neutral'} />
+                <Metric label="ML Risk"
+                  value={current?.ml_risk_level ?? '—'}
+                  sub={current?.ml_confidence != null ? `${current.ml_confidence}% confidence` : 'no model'}
+                  accent={
+                    current?.ml_risk_level === 'CRITICAL' ? 'red' :
+                    current?.ml_risk_level === 'HIGH'     ? 'amber' :
+                    current?.ml_risk_level === 'MEDIUM'   ? 'amber' : 'green'
+                  } />
               </div>
             </div>
 
-            {/* Alert banner inline */}
+            {/* Alert inline */}
             {current?.alert_active && current?.surge_type !== 'SELF_RESOLVING' && (
               <div className={`rounded-xl p-4 flex items-start gap-3 border ${
                 current.surge_type === 'GENUINE_CRUSH'
@@ -252,6 +293,7 @@ export default function App() {
                   </p>
                   <p className="text-xs text-gray-400 mt-0.5">
                     ID: {current.alert_id} · CPI {current.cpi?.toFixed(3)}
+                    {current.ml_confidence != null && ` · ML: ${current.ml_confidence}% · ${current.ml_risk_level}`}
                   </p>
                 </div>
               </div>
@@ -287,7 +329,16 @@ export default function App() {
                 ))}
               </div>
             </div>
+
+            {/* What-If Simulator — collapsible panel below gauge area */}
+            <WhatIfSimulator />
+
           </div>
+        )}
+
+        {/* ═══════════ COMPARE ═══════════ */}
+        {tab === 'Compare' && (
+          <CorridorCompare readings={allReadings} onSelect={(c) => { setCorridor(c); setTab('Dashboard') }} />
         )}
 
         {/* ═══════════ MAP ═══════════ */}
@@ -296,7 +347,7 @@ export default function App() {
             <CorridorMap readings={allReadings} selected={corridor} onSelect={setCorridor} />
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
               {CORRIDORS.map((c) => {
-                const r = readings[c]
+                const r   = readings[c]
                 const cpi = r?.cpi
                 return (
                   <button key={c} onClick={() => setCorridor(c)}
@@ -309,6 +360,9 @@ export default function App() {
                     </p>
                     {r?.surge_type && r.surge_type !== 'NORMAL' && (
                       <p className="text-xs text-amber-400 mt-1">{r.surge_type}</p>
+                    )}
+                    {r?.ml_confidence != null && (
+                      <p className="text-xs text-blue-400 mt-0.5">ML: {r.ml_confidence}%</p>
                     )}
                   </button>
                 )

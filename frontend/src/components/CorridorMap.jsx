@@ -1,30 +1,73 @@
 import React from 'react'
-import { MapContainer, TileLayer, CircleMarker, Tooltip, Polyline } from 'react-leaflet'
+import { MapContainer, TileLayer, CircleMarker, Marker, Tooltip } from 'react-leaflet'
+import L from 'leaflet'
 
 const CORRIDOR_GEO = {
-  Ambaji:   { center: [24.3368, 72.8502], chokepoints: [[24.334, 72.848], [24.337, 72.851], [24.339, 72.852]] },
-  Dwarka:   { center: [22.2394, 68.9678], chokepoints: [[22.237, 68.965], [22.241, 68.970]] },
-  Somnath:  { center: [20.8880, 70.4012], chokepoints: [[20.885, 70.399], [20.888, 70.401], [20.890, 70.403], [20.887, 70.405]] },
-  Pavagadh: { center: [22.4962, 73.5247], chokepoints: [[22.493, 73.522], [22.497, 73.525], [22.499, 73.527]] },
+  Ambaji: {
+    center: [23.7267, 72.8503],
+    chokepoints: [
+      [23.7250, 72.8490],
+      [23.7267, 72.8510],
+      [23.7280, 72.8498],
+    ],
+  },
+  Dwarka: {
+    center: [22.2394, 68.9678],
+    chokepoints: [
+      [22.2375, 68.9660],
+      [22.2410, 68.9695],
+    ],
+  },
+  Somnath: {
+    center: [20.8880, 70.4013],
+    chokepoints: [
+      [20.8860, 70.3995],
+      [20.8895, 70.4025],
+    ],
+  },
+  Pavagadh: {
+    center: [22.4673, 73.5315],
+    chokepoints: [
+      [22.4655, 73.5298],
+      [22.4688, 73.5330],
+    ],
+  },
 }
 
-/**
- * Leaflet map showing corridor markers + chokepoints.
- *
- * Props:
- *   readings  — array of live CPI objects
- *   selected  — currently selected corridor
- *   onSelect  — callback(name)
- */
+// Creates a DivIcon with a pulsing ring (uses Tailwind animate-ping)
+function makePulseIcon(color, sizePx) {
+  const half = sizePx / 2
+  return new L.DivIcon({
+    className: '',
+    html: `<div style="width:${sizePx}px;height:${sizePx}px;position:relative">
+      <div class="animate-ping" style="
+        position:absolute;inset:0;border-radius:50%;
+        background:${color};opacity:0.55;
+      "></div>
+      <div style="
+        position:absolute;inset:30%;border-radius:50%;
+        background:${color};opacity:0.9;
+      "></div>
+    </div>`,
+    iconSize:   [sizePx, sizePx],
+    iconAnchor: [half, half],
+  })
+}
+
+function cpiToColor(cpi) {
+  if (cpi == null) return '#6b7280'
+  if (cpi >= 0.70)  return '#ef4444'
+  if (cpi >= 0.40)  return '#f59e0b'
+  return '#22c55e'
+}
+
+// Circle radius scales with CPI: 5–20px
+function cpiToRadius(cpi) {
+  return 5 + Math.round((cpi || 0) * 15)
+}
+
 export default function CorridorMap({ readings = [], selected, onSelect }) {
   const byName = Object.fromEntries(readings.map((r) => [r.corridor, r]))
-
-  const markerColor = (cpi) => {
-    if (cpi == null) return '#6b7280'
-    if (cpi < 0.40)  return '#22c55e'
-    if (cpi < 0.70)  return '#f59e0b'
-    return '#ef4444'
-  }
 
   return (
     <div className="rounded-xl overflow-hidden border border-gray-700" style={{ height: 340 }}>
@@ -40,17 +83,19 @@ export default function CorridorMap({ readings = [], selected, onSelect }) {
         />
 
         {Object.entries(CORRIDOR_GEO).map(([name, geo]) => {
-          const r = byName[name]
-          const cpi = r?.cpi ?? 0
-          const color = markerColor(cpi)
+          const r          = byName[name]
+          const cpi        = r?.cpi ?? 0
+          const color      = cpiToColor(cpi)
           const isSelected = selected === name
+          const isPulsing  = cpi > 0.70
+          const radius     = cpiToRadius(cpi)
 
           return (
             <React.Fragment key={name}>
-              {/* Main corridor marker */}
+              {/* Main corridor marker — radius scales with CPI */}
               <CircleMarker
                 center={geo.center}
-                radius={isSelected ? 20 : 13}
+                radius={isSelected ? radius + 6 : radius}
                 pathOptions={{
                   color:       isSelected ? '#ffffff' : color,
                   fillColor:   color,
@@ -60,31 +105,46 @@ export default function CorridorMap({ readings = [], selected, onSelect }) {
                 eventHandlers={{ click: () => onSelect?.(name) }}
               >
                 <Tooltip sticky>
-                  <div className="text-xs font-mono">
+                  <div style={{ fontSize: 12, fontFamily: 'monospace' }}>
                     <strong>{name}</strong><br />
                     CPI: {cpi.toFixed(3)}<br />
-                    {r?.surge_type && `Type: ${r.surge_type}`}
+                    {r?.surge_type && `Type: ${r.surge_type}`}<br />
+                    {r?.ml_confidence != null && `ML Confidence: ${r.ml_confidence}%`}
                   </div>
                 </Tooltip>
               </CircleMarker>
 
               {/* Chokepoint markers */}
               {geo.chokepoints.map((pos, idx) => (
-                <CircleMarker
-                  key={idx}
-                  center={pos}
-                  radius={5}
-                  pathOptions={{
-                    color:       '#f59e0b',
-                    fillColor:   cpi > 0.70 ? '#ef4444' : '#f59e0b',
-                    fillOpacity: 0.75,
-                    weight:      1,
-                  }}
-                >
-                  <Tooltip>
-                    <span className="text-xs">Choke Point {idx + 1} — {name}</span>
-                  </Tooltip>
-                </CircleMarker>
+                <React.Fragment key={idx}>
+                  {/* Pulse ring overlay when CPI > 0.7 */}
+                  {isPulsing && (
+                    <Marker
+                      position={pos}
+                      icon={makePulseIcon(color, 24)}
+                      interactive={false}
+                    />
+                  )}
+
+                  {/* Solid chokepoint dot */}
+                  <CircleMarker
+                    center={pos}
+                    radius={isPulsing ? 6 : 4}
+                    pathOptions={{
+                      color:       color,
+                      fillColor:   isPulsing ? '#ef4444' : color,
+                      fillOpacity: isPulsing ? 1.0 : 0.75,
+                      weight:      1,
+                    }}
+                  >
+                    <Tooltip>
+                      <div style={{ fontSize: 11 }}>
+                        Chokepoint {idx + 1} — {name}<br />
+                        CPI: {cpi.toFixed(3)}
+                      </div>
+                    </Tooltip>
+                  </CircleMarker>
+                </React.Fragment>
               ))}
             </React.Fragment>
           )

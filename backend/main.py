@@ -16,24 +16,27 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 import uvicorn
 
-from simulator import get_all_readings, get_corridor_reading, get_corridors, get_corridor_config
-from database import init_db, insert_alert, ack_alert, get_alerts, log_cpi, get_events
+from simulator import (
+    get_all_readings, get_corridor_reading, get_corridors,
+    get_corridor_config, CORRIDOR_BASELINES, DENSITY_DANGER_THRESHOLD,
+)
+from database import init_db, insert_alert, ack_alert, get_alerts, log_cpi, get_events, get_alert_by_id
 from replay_data import REPLAY_FRAMES
 
 # ── ML predictor (optional — graceful if models not yet trained) ──────────────
 try:
-    from ml.predictor import predict as ml_predict, load_models, model_info
+    from ml.predictor import predict as ml_predict, load_models, model_info, predict_with_confidence
     _ML_AVAILABLE = True
 except ImportError:
     _ML_AVAILABLE = False
 
 # ── App ───────────────────────────────────────────────────────────────────────
-app = FastAPI(title="TS-11 Stampede Predictor", version="2.0.0")
+app = FastAPI(title="TS-11 Stampede Predictor", version="2.1.0")
 
 _frontend = os.getenv("FRONTEND_URL", "*")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[_frontend, "http://localhost:5173", "http://localhost:4173","https://frontend-bnr9.onrender.com", "*"],
+    allow_origins=[_frontend, "http://localhost:5173", "http://localhost:4173", "https://frontend-bnr9.onrender.com", "*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -69,7 +72,6 @@ async def _broadcast_loop():
     while True:
         readings = get_all_readings()
         for r in readings:
-            # Persist to CPI log
             await log_cpi(
                 corridor=r["corridor"],
                 cpi=r["cpi"],
@@ -79,15 +81,14 @@ async def _broadcast_loop():
                 surge_type=r["surge_type"],
                 alert_fired=r["alert_active"],
             )
-            # Persist new alerts to alerts table
             if r["alert_active"] and r["alert_id"]:
                 await insert_alert(
                     alert_id=r["alert_id"],
                     corridor=r["corridor"],
                     cpi=r["cpi"],
                     surge_type=r["surge_type"],
+                    ml_confidence=r.get("ml_confidence"),
                 )
-        # Broadcast all corridor readings in one message
         await mgr.broadcast({"type": "cpi_batch", "data": readings})
         await asyncio.sleep(2)
 
@@ -97,12 +98,11 @@ async def _broadcast_loop():
 async def startup():
     await init_db()
     asyncio.create_task(_broadcast_loop())
-    # Pre-load ML models so first request has no cold-start latency
     if _ML_AVAILABLE:
         try:
             load_models()
         except FileNotFoundError:
-            print("[main] ML models not yet trained — run `python -m ml.train` to enable /api/ml/predict")
+            print("[main] ML models not yet trained — run `python -m ml.train`")
 
 
 # ── Health ────────────────────────────────────────────────────────────────────
@@ -122,7 +122,7 @@ async def websocket(ws: WebSocket):
     await mgr.connect(ws)
     try:
         while True:
-            await ws.receive_text()  # keep-alive / client pings
+            await ws.receive_text()
     except WebSocketDisconnect:
         mgr.disconnect(ws)
 
@@ -141,10 +141,6 @@ async def alerts(limit: int = 50):
 
 
 # ── Acknowledge ───────────────────────────────────────────────────────────────
-class AckBody(BaseModel):
-    agency: str  # police | temple | gsrtc
-
-
 @app.post("/api/ack/{alert_id}/{agency}")
 async def acknowledge(alert_id: str, agency: str):
     if agency not in ("police", "temple", "gsrtc"):
@@ -165,7 +161,7 @@ async def events(limit: int = 50):
 @app.get("/api/events/export")
 async def export_events():
     rows = await get_events(limit=1000)
-    buf = io.StringIO()
+    buf  = io.StringIO()
     if rows:
         writer = csv.DictWriter(buf, fieldnames=rows[0].keys())
         writer.writeheader()
@@ -193,7 +189,7 @@ async def replay_all():
     return {"frames": REPLAY_FRAMES, "total": len(REPLAY_FRAMES)}
 
 
-# ── ML Prediction ────────────────────────────────────────────────────────────
+# ── ML Prediction ─────────────────────────────────────────────────────────────
 class MLPredictRequest(BaseModel):
     location: Optional[str] = "Ambaji"
     corridor_width_m: Optional[float] = 5.0
@@ -210,40 +206,138 @@ class MLPredictRequest(BaseModel):
 
 @app.post("/api/ml/predict")
 async def ml_predict_endpoint(body: MLPredictRequest):
-    """
-    Predict crowd crush risk level using the trained XGBoost model.
-
-    Returns:
-      prediction   : SAFE | SURGE | HIGH_RISK
-      confidence   : probability of the predicted class
-      probabilities: breakdown for all 3 classes
-    """
     if not _ML_AVAILABLE:
-        raise HTTPException(
-            status_code=503,
-            detail="ML module is unavailable. Check that scikit-learn and xgboost are installed.",
-        )
+        raise HTTPException(503, "ML module is unavailable.")
     try:
         result = ml_predict(body.model_dump())
     except FileNotFoundError as exc:
-        raise HTTPException(
-            status_code=503,
-            detail=str(exc) + " — run `python -m ml.train` to train the model first.",
-        )
+        raise HTTPException(503, str(exc) + " — run `python -m ml.train` first.")
     except Exception as exc:
-        raise HTTPException(status_code=500, detail=f"Prediction failed: {exc}")
+        raise HTTPException(500, f"Prediction failed: {exc}")
     return result
 
 
 @app.get("/api/ml/info")
 async def ml_info_endpoint():
-    """Return metadata about the loaded ML model."""
     if not _ML_AVAILABLE:
-        raise HTTPException(status_code=503, detail="ML module unavailable.")
+        raise HTTPException(503, "ML module unavailable.")
     try:
         return model_info()
     except FileNotFoundError as exc:
-        raise HTTPException(status_code=503, detail=str(exc))
+        raise HTTPException(503, str(exc))
+
+
+# ── What-If Simulator ─────────────────────────────────────────────────────────
+class SimulateBody(BaseModel):
+    corridor: Optional[str] = "Ambaji"
+    flow_rate: Optional[float] = 100.0
+    transport_burst: Optional[float] = 0.2
+    chokepoint_density: Optional[float] = 0.3
+
+
+@app.post("/api/simulate")
+async def simulate_endpoint(body: SimulateBody):
+    """
+    Pure what-if CPI calculation — does NOT affect live simulation.
+    Returns: {cpi, surge_type, time_to_breach_seconds, ml_confidence}
+    """
+    baseline = CORRIDOR_BASELINES.get(body.corridor, CORRIDOR_BASELINES["Ambaji"])
+
+    norm_flow    = min((body.flow_rate or 0) / baseline["capacity_ppm"], 1.0)
+    norm_density = min(body.chokepoint_density or 0, 1.0)
+    transport    = min(body.transport_burst or 0, 1.0)
+
+    cpi = norm_flow * 0.5 + transport * 0.3 + norm_density * 0.2
+    cpi = round(max(0.0, min(cpi, 1.0)), 3)
+
+    # Surge type from CPI thresholds
+    if cpi >= 0.85:
+        surge_type = "GENUINE_CRUSH"
+    elif cpi >= 0.70:
+        surge_type = "GENUINE_CRUSH"
+    elif cpi >= 0.50:
+        surge_type = "SELF_RESOLVING"
+    else:
+        surge_type = "SAFE"
+
+    # Estimate TTB: assume steady 1% CPI rise per 2s (simple model)
+    if cpi < 0.85 and cpi >= 0.40:
+        assumed_slope = 0.008 + (cpi - 0.40) * 0.02
+        ttb_s = int((0.85 - cpi) / assumed_slope)
+    elif cpi >= 0.85:
+        ttb_s = 0
+    else:
+        ttb_s = None
+
+    # ML confidence
+    ml_confidence = None
+    if _ML_AVAILABLE:
+        try:
+            res = predict_with_confidence({
+                "cpi":               cpi,
+                "flow_rate":         body.flow_rate,
+                "transport_burst":   transport,
+                "chokepoint_density": norm_density,
+            })
+            ml_confidence = res.get("confidence_score")
+        except Exception:
+            pass
+
+    return {
+        "cpi":                    cpi,
+        "surge_type":             surge_type,
+        "time_to_breach_seconds": ttb_s,
+        "ml_confidence":          ml_confidence,
+    }
+
+
+# ── Incident Report ───────────────────────────────────────────────────────────
+@app.get("/api/report/{alert_id}")
+async def get_report(alert_id: str):
+    """
+    Return a full incident report for a given alert_id.
+    """
+    alert = await get_alert_by_id(alert_id)
+    if not alert:
+        raise HTTPException(404, f"Alert {alert_id} not found")
+
+    fired_dt = datetime.fromisoformat(alert["fired_at"])
+
+    ack_times = {
+        "police": alert.get("police_ack"),
+        "temple": alert.get("temple_ack"),
+        "gsrtc":  alert.get("gsrtc_ack"),
+    }
+
+    all_acked  = all(v for v in ack_times.values())
+    any_acked  = any(v for v in ack_times.values())
+    resolved_at = None
+    duration_seconds = None
+
+    if all_acked:
+        resolved_dt  = max(datetime.fromisoformat(t) for t in ack_times.values())
+        resolved_at  = resolved_dt.isoformat()
+        duration_seconds = int((resolved_dt - fired_dt).total_seconds())
+        outcome = "FULLY_RESOLVED"
+    elif any_acked:
+        outcome = "PARTIAL_ACK"
+    else:
+        outcome = "UNACKNOWLEDGED"
+
+    return {
+        "alert_id":         alert_id,
+        "corridor":         alert["corridor"],
+        "peak_cpi":         alert["cpi"],
+        "surge_type":       alert["surge_type"],
+        "fired_at":         alert["fired_at"],
+        "police_ack_time":  ack_times["police"],
+        "temple_ack_time":  ack_times["temple"],
+        "gsrtc_ack_time":   ack_times["gsrtc"],
+        "ml_confidence":    alert.get("ml_confidence"),
+        "duration_seconds": duration_seconds,
+        "resolved_at":      resolved_at,
+        "outcome":          outcome,
+    }
 
 
 # ── Entry point ───────────────────────────────────────────────────────────────
