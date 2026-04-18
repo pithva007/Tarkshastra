@@ -1,0 +1,4562 @@
+[
+  {
+    "index": 0,
+    "timestamp_s": 0,
+    "timestamp_label": "00:00",
+    "corridor": "Ambaji",
+    "cpi": 0.298,
+    "flow_rate": 3109.1,
+    "transport_burst": 0.362,
+    "chokepoint_density": 0.437,
+    "slope": 0.00215,
+    "time_to_breach": null,
+    "prediction_fired": false,
+    "alert": {
+      "type": "none",
+      "message": "",
+      "severity": "none"
+    },
+    "phase": "normal"
+  },
+  {
+    "index": 1,
+    "timestamp_s": 5,
+    "timestamp_label": "00:05",
+    "corridor": "Ambaji",
+    "cpi": 0.284,
+    "flow_rate": 3110.7,
+    "transport_burst": 0.348,
+    "chokepoint_density": 0.41,
+    "slope": 0.00854,
+    "time_to_breach": null,
+    "prediction_fired": false,
+    "alert": {
+      "type": "none",
+      "message": "",
+      "severity": "none"
+    },
+    "phase": "normal"
+  },
+  {
+    "index": 2,
+    "timestamp_s": 10,
+    "timestamp_label": "00:10",
+    "corridor": "Ambaji",
+    "cpi": 0.307,
+    "flow_rate": 3256.3,
+    "transport_burst": 0.387,
+    "chokepoint_density": 0.43,
+    "slope": -0.0018,
+    "time_to_breach": null,
+    "prediction_fired": false,
+    "alert": {
+      "type": "none",
+      "message": "",
+      "severity": "none"
+    },
+    "phase": "normal"
+  },
+  {
+    "index": 3,
+    "timestamp_s": 15,
+    "timestamp_label": "00:15",
+    "corridor": "Ambaji",
+    "cpi": 0.294,
+    "flow_rate": 3133.8,
+    "transport_burst": 0.395,
+    "chokepoint_density": 0.421,
+    "slope": 0.00572,
+    "time_to_breach": null,
+    "prediction_fired": false,
+    "alert": {
+      "type": "none",
+      "message": "",
+      "severity": "none"
+    },
+    "phase": "normal"
+  },
+  {
+    "index": 4,
+    "timestamp_s": 20,
+    "timestamp_label": "00:20",
+    "corridor": "Ambaji",
+    "cpi": 0.315,
+    "flow_rate": 3044.8,
+    "transport_burst": 0.369,
+    "chokepoint_density": 0.442,
+    "slope": 0.00345,
+    "time_to_breach": null,
+    "prediction_fired": false,
+    "alert": {
+      "type": "none",
+      "message": "",
+      "severity": "none"
+    },
+    "phase": "normal"
+  },
+  {
+    "index": 5,
+    "timestamp_s": 25,
+    "timestamp_label": "00:25",
+    "corridor": "Ambaji",
+    "cpi": 0.308,
+    "flow_rate": 3187.2,
+    "transport_burst": 0.378,
+    "chokepoint_density": 0.444,
+    "slope": -0.00141,
+    "time_to_breach": null,
+    "prediction_fired": false,
+    "alert": {
+      "type": "none",
+      "message": "",
+      "severity": "none"
+    },
+    "phase": "normal"
+  },
+  {
+    "index": 6,
+    "timestamp_s": 30,
+    "timestamp_label": "00:30",
+    "corridor": "Ambaji",
+    "cpi": 0.319,
+    "flow_rate": 3053.6,
+    "transport_burst": 0.314,
+    "chokepoint_density": 0.423,
+    "slope": -0.00385,
+    "time_to_breach": null,
+    "prediction_fired": false,
+    "alert": {
+      "type": "none",
+      "message": "",
+      "severity": "none"
+    },
+    "phase": "normal"
+  },
+  {
+    "index": 7,
+    "timestamp_s": 35,
+    "timestamp_label": "00:35",
+    "corridor": "Ambaji",
+    "cpi": 0.325,
+    "flow_rate": 3267.6,
+    "transport_burst": 0.354,
+    "chokepoint_density": 0.456,
+    "slope": -0.00543,
+    "time_to_breach": null,
+    "prediction_fired": false,
+    "alert": {
+      "type": "none",
+      "message": "",
+      "severity": "none"
+    },
+    "phase": "normal"
+  },
+  {
+    "index": 8,
+    "timestamp_s": 40,
+    "timestamp_label": "00:40",
+    "corridor": "Ambaji",
+    "cpi": 0.316,
+    "flow_rate": 3152.0,
+    "transport_burst": 0.38,
+    "chokepoint_density": 0.449,
+    "slope": 0.00498,
+    "time_to_breach": null,
+    "prediction_fired": false,
+    "alert": {
+      "type": "none",
+      "message": "",
+      "severity": "none"
+    },
+    "phase": "normal"
+  },
+  {
+    "index": 9,
+    "timestamp_s": 45,
+    "timestamp_label": "00:45",
+    "corridor": "Ambaji",
+    "cpi": 0.323,
+    "flow_rate": 3259.6,
+    "transport_burst": 0.394,
+    "chokepoint_density": 0.425,
+    "slope": -0.00219,
+    "time_to_breach": null,
+    "prediction_fired": false,
+    "alert": {
+      "type": "none",
+      "message": "",
+      "severity": "none"
+    },
+    "phase": "normal"
+  },
+  {
+    "index": 10,
+    "timestamp_s": 50,
+    "timestamp_label": "00:50",
+    "corridor": "Ambaji",
+    "cpi": 0.315,
+    "flow_rate": 3222.0,
+    "transport_burst": 0.371,
+    "chokepoint_density": 0.48,
+    "slope": 0.00069,
+    "time_to_breach": null,
+    "prediction_fired": false,
+    "alert": {
+      "type": "none",
+      "message": "",
+      "severity": "none"
+    },
+    "phase": "normal"
+  },
+  {
+    "index": 11,
+    "timestamp_s": 55,
+    "timestamp_label": "00:55",
+    "corridor": "Ambaji",
+    "cpi": 0.31,
+    "flow_rate": 3229.3,
+    "transport_burst": 0.409,
+    "chokepoint_density": 0.44,
+    "slope": 0.00982,
+    "time_to_breach": null,
+    "prediction_fired": false,
+    "alert": {
+      "type": "none",
+      "message": "",
+      "severity": "none"
+    },
+    "phase": "normal"
+  },
+  {
+    "index": 12,
+    "timestamp_s": 60,
+    "timestamp_label": "01:00",
+    "corridor": "Ambaji",
+    "cpi": 0.342,
+    "flow_rate": 3252.1,
+    "transport_burst": 0.361,
+    "chokepoint_density": 0.438,
+    "slope": 0.00019,
+    "time_to_breach": null,
+    "prediction_fired": false,
+    "alert": {
+      "type": "none",
+      "message": "",
+      "severity": "none"
+    },
+    "phase": "normal"
+  },
+  {
+    "index": 13,
+    "timestamp_s": 65,
+    "timestamp_label": "01:04",
+    "corridor": "Ambaji",
+    "cpi": 0.31,
+    "flow_rate": 3163.3,
+    "transport_burst": 0.379,
+    "chokepoint_density": 0.423,
+    "slope": 0.01075,
+    "time_to_breach": null,
+    "prediction_fired": false,
+    "alert": {
+      "type": "none",
+      "message": "",
+      "severity": "none"
+    },
+    "phase": "normal"
+  },
+  {
+    "index": 14,
+    "timestamp_s": 70,
+    "timestamp_label": "01:10",
+    "corridor": "Ambaji",
+    "cpi": 0.336,
+    "flow_rate": 3450.9,
+    "transport_burst": 0.408,
+    "chokepoint_density": 0.433,
+    "slope": -0.00249,
+    "time_to_breach": null,
+    "prediction_fired": false,
+    "alert": {
+      "type": "none",
+      "message": "",
+      "severity": "none"
+    },
+    "phase": "normal"
+  },
+  {
+    "index": 15,
+    "timestamp_s": 75,
+    "timestamp_label": "01:15",
+    "corridor": "Ambaji",
+    "cpi": 0.321,
+    "flow_rate": 3281.6,
+    "transport_burst": 0.367,
+    "chokepoint_density": 0.435,
+    "slope": 0.00841,
+    "time_to_breach": null,
+    "prediction_fired": false,
+    "alert": {
+      "type": "none",
+      "message": "",
+      "severity": "none"
+    },
+    "phase": "normal"
+  },
+  {
+    "index": 16,
+    "timestamp_s": 80,
+    "timestamp_label": "01:19",
+    "corridor": "Ambaji",
+    "cpi": 0.325,
+    "flow_rate": 3180.0,
+    "transport_burst": 0.338,
+    "chokepoint_density": 0.417,
+    "slope": 0.00271,
+    "time_to_breach": null,
+    "prediction_fired": false,
+    "alert": {
+      "type": "none",
+      "message": "",
+      "severity": "none"
+    },
+    "phase": "normal"
+  },
+  {
+    "index": 17,
+    "timestamp_s": 85,
+    "timestamp_label": "01:25",
+    "corridor": "Ambaji",
+    "cpi": 0.34,
+    "flow_rate": 3362.7,
+    "transport_burst": 0.395,
+    "chokepoint_density": 0.453,
+    "slope": 0.00109,
+    "time_to_breach": null,
+    "prediction_fired": false,
+    "alert": {
+      "type": "none",
+      "message": "",
+      "severity": "none"
+    },
+    "phase": "normal"
+  },
+  {
+    "index": 18,
+    "timestamp_s": 90,
+    "timestamp_label": "01:30",
+    "corridor": "Ambaji",
+    "cpi": 0.351,
+    "flow_rate": 3367.0,
+    "transport_burst": 0.409,
+    "chokepoint_density": 0.433,
+    "slope": 0.00136,
+    "time_to_breach": null,
+    "prediction_fired": false,
+    "alert": {
+      "type": "none",
+      "message": "",
+      "severity": "none"
+    },
+    "phase": "normal"
+  },
+  {
+    "index": 19,
+    "timestamp_s": 95,
+    "timestamp_label": "01:34",
+    "corridor": "Ambaji",
+    "cpi": 0.344,
+    "flow_rate": 3377.3,
+    "transport_burst": 0.397,
+    "chokepoint_density": 0.489,
+    "slope": -0.00088,
+    "time_to_breach": null,
+    "prediction_fired": false,
+    "alert": {
+      "type": "none",
+      "message": "",
+      "severity": "none"
+    },
+    "phase": "normal"
+  },
+  {
+    "index": 20,
+    "timestamp_s": 100,
+    "timestamp_label": "01:40",
+    "corridor": "Ambaji",
+    "cpi": 0.361,
+    "flow_rate": 3328.8,
+    "transport_burst": 0.397,
+    "chokepoint_density": 0.437,
+    "slope": -0.00489,
+    "time_to_breach": null,
+    "prediction_fired": false,
+    "alert": {
+      "type": "none",
+      "message": "",
+      "severity": "none"
+    },
+    "phase": "normal"
+  },
+  {
+    "index": 21,
+    "timestamp_s": 105,
+    "timestamp_label": "01:45",
+    "corridor": "Ambaji",
+    "cpi": 0.361,
+    "flow_rate": 3392.0,
+    "transport_burst": 0.427,
+    "chokepoint_density": 0.412,
+    "slope": -0.00077,
+    "time_to_breach": null,
+    "prediction_fired": false,
+    "alert": {
+      "type": "none",
+      "message": "",
+      "severity": "none"
+    },
+    "phase": "normal"
+  },
+  {
+    "index": 22,
+    "timestamp_s": 110,
+    "timestamp_label": "01:49",
+    "corridor": "Ambaji",
+    "cpi": 0.353,
+    "flow_rate": 3243.3,
+    "transport_burst": 0.388,
+    "chokepoint_density": 0.454,
+    "slope": 0.00676,
+    "time_to_breach": null,
+    "prediction_fired": false,
+    "alert": {
+      "type": "none",
+      "message": "",
+      "severity": "none"
+    },
+    "phase": "normal"
+  },
+  {
+    "index": 23,
+    "timestamp_s": 115,
+    "timestamp_label": "01:55",
+    "corridor": "Ambaji",
+    "cpi": 0.335,
+    "flow_rate": 3200.8,
+    "transport_burst": 0.425,
+    "chokepoint_density": 0.436,
+    "slope": 0.00485,
+    "time_to_breach": null,
+    "prediction_fired": false,
+    "alert": {
+      "type": "none",
+      "message": "",
+      "severity": "none"
+    },
+    "phase": "normal"
+  },
+  {
+    "index": 24,
+    "timestamp_s": 120,
+    "timestamp_label": "02:00",
+    "corridor": "Ambaji",
+    "cpi": 0.351,
+    "flow_rate": 3176.9,
+    "transport_burst": 0.408,
+    "chokepoint_density": 0.429,
+    "slope": 0.00523,
+    "time_to_breach": null,
+    "prediction_fired": false,
+    "alert": {
+      "type": "none",
+      "message": "",
+      "severity": "none"
+    },
+    "phase": "normal"
+  },
+  {
+    "index": 25,
+    "timestamp_s": 125,
+    "timestamp_label": "02:05",
+    "corridor": "Ambaji",
+    "cpi": 0.352,
+    "flow_rate": 3497.1,
+    "transport_burst": 0.411,
+    "chokepoint_density": 0.482,
+    "slope": -0.00314,
+    "time_to_breach": null,
+    "prediction_fired": false,
+    "alert": {
+      "type": "none",
+      "message": "",
+      "severity": "none"
+    },
+    "phase": "normal"
+  },
+  {
+    "index": 26,
+    "timestamp_s": 130,
+    "timestamp_label": "02:09",
+    "corridor": "Ambaji",
+    "cpi": 0.353,
+    "flow_rate": 3322.5,
+    "transport_burst": 0.448,
+    "chokepoint_density": 0.421,
+    "slope": 0.00653,
+    "time_to_breach": null,
+    "prediction_fired": false,
+    "alert": {
+      "type": "none",
+      "message": "",
+      "severity": "none"
+    },
+    "phase": "normal"
+  },
+  {
+    "index": 27,
+    "timestamp_s": 135,
+    "timestamp_label": "02:15",
+    "corridor": "Ambaji",
+    "cpi": 0.363,
+    "flow_rate": 3464.4,
+    "transport_burst": 0.429,
+    "chokepoint_density": 0.462,
+    "slope": -0.00237,
+    "time_to_breach": null,
+    "prediction_fired": false,
+    "alert": {
+      "type": "none",
+      "message": "",
+      "severity": "none"
+    },
+    "phase": "normal"
+  },
+  {
+    "index": 28,
+    "timestamp_s": 140,
+    "timestamp_label": "02:20",
+    "corridor": "Ambaji",
+    "cpi": 0.343,
+    "flow_rate": 3282.0,
+    "transport_burst": 0.392,
+    "chokepoint_density": 0.49,
+    "slope": 0.00463,
+    "time_to_breach": null,
+    "prediction_fired": false,
+    "alert": {
+      "type": "none",
+      "message": "",
+      "severity": "none"
+    },
+    "phase": "normal"
+  },
+  {
+    "index": 29,
+    "timestamp_s": 145,
+    "timestamp_label": "02:24",
+    "corridor": "Ambaji",
+    "cpi": 0.364,
+    "flow_rate": 3188.0,
+    "transport_burst": 0.402,
+    "chokepoint_density": 0.466,
+    "slope": 0.0041,
+    "time_to_breach": null,
+    "prediction_fired": false,
+    "alert": {
+      "type": "none",
+      "message": "",
+      "severity": "none"
+    },
+    "phase": "normal"
+  },
+  {
+    "index": 30,
+    "timestamp_s": 150,
+    "timestamp_label": "02:30",
+    "corridor": "Ambaji",
+    "cpi": 0.38,
+    "flow_rate": 3373.6,
+    "transport_burst": 0.396,
+    "chokepoint_density": 0.479,
+    "slope": -0.00164,
+    "time_to_breach": null,
+    "prediction_fired": false,
+    "alert": {
+      "type": "none",
+      "message": "",
+      "severity": "none"
+    },
+    "phase": "normal"
+  },
+  {
+    "index": 31,
+    "timestamp_s": 155,
+    "timestamp_label": "02:35",
+    "corridor": "Ambaji",
+    "cpi": 0.37,
+    "flow_rate": 3285.5,
+    "transport_burst": 0.445,
+    "chokepoint_density": 0.467,
+    "slope": 0.00292,
+    "time_to_breach": null,
+    "prediction_fired": false,
+    "alert": {
+      "type": "none",
+      "message": "",
+      "severity": "none"
+    },
+    "phase": "normal"
+  },
+  {
+    "index": 32,
+    "timestamp_s": 160,
+    "timestamp_label": "02:39",
+    "corridor": "Ambaji",
+    "cpi": 0.382,
+    "flow_rate": 3438.9,
+    "transport_burst": 0.432,
+    "chokepoint_density": 0.515,
+    "slope": -0.00204,
+    "time_to_breach": null,
+    "prediction_fired": false,
+    "alert": {
+      "type": "none",
+      "message": "",
+      "severity": "none"
+    },
+    "phase": "normal"
+  },
+  {
+    "index": 33,
+    "timestamp_s": 165,
+    "timestamp_label": "02:45",
+    "corridor": "Ambaji",
+    "cpi": 0.365,
+    "flow_rate": 3342.2,
+    "transport_burst": 0.45,
+    "chokepoint_density": 0.464,
+    "slope": 0.00534,
+    "time_to_breach": null,
+    "prediction_fired": false,
+    "alert": {
+      "type": "none",
+      "message": "",
+      "severity": "none"
+    },
+    "phase": "normal"
+  },
+  {
+    "index": 34,
+    "timestamp_s": 170,
+    "timestamp_label": "02:50",
+    "corridor": "Ambaji",
+    "cpi": 0.385,
+    "flow_rate": 3347.9,
+    "transport_burst": 0.384,
+    "chokepoint_density": 0.479,
+    "slope": -0.0015,
+    "time_to_breach": null,
+    "prediction_fired": false,
+    "alert": {
+      "type": "none",
+      "message": "",
+      "severity": "none"
+    },
+    "phase": "normal"
+  },
+  {
+    "index": 35,
+    "timestamp_s": 175,
+    "timestamp_label": "02:54",
+    "corridor": "Ambaji",
+    "cpi": 0.366,
+    "flow_rate": 3411.8,
+    "transport_burst": 0.428,
+    "chokepoint_density": 0.442,
+    "slope": 0.00714,
+    "time_to_breach": null,
+    "prediction_fired": false,
+    "alert": {
+      "type": "none",
+      "message": "",
+      "severity": "none"
+    },
+    "phase": "normal"
+  },
+  {
+    "index": 36,
+    "timestamp_s": 180,
+    "timestamp_label": "03:00",
+    "corridor": "Ambaji",
+    "cpi": 0.373,
+    "flow_rate": 3221.7,
+    "transport_burst": 0.43,
+    "chokepoint_density": 0.465,
+    "slope": 0.00072,
+    "time_to_breach": null,
+    "prediction_fired": false,
+    "alert": {
+      "type": "none",
+      "message": "",
+      "severity": "none"
+    },
+    "phase": "normal"
+  },
+  {
+    "index": 37,
+    "timestamp_s": 185,
+    "timestamp_label": "03:05",
+    "corridor": "Ambaji",
+    "cpi": 0.384,
+    "flow_rate": 3434.9,
+    "transport_burst": 0.412,
+    "chokepoint_density": 0.481,
+    "slope": 0.00489,
+    "time_to_breach": null,
+    "prediction_fired": false,
+    "alert": {
+      "type": "none",
+      "message": "",
+      "severity": "none"
+    },
+    "phase": "normal"
+  },
+  {
+    "index": 38,
+    "timestamp_s": 190,
+    "timestamp_label": "03:09",
+    "corridor": "Ambaji",
+    "cpi": 0.372,
+    "flow_rate": 3388.4,
+    "transport_burst": 0.418,
+    "chokepoint_density": 0.511,
+    "slope": -0.00168,
+    "time_to_breach": null,
+    "prediction_fired": false,
+    "alert": {
+      "type": "none",
+      "message": "",
+      "severity": "none"
+    },
+    "phase": "normal"
+  },
+  {
+    "index": 39,
+    "timestamp_s": 195,
+    "timestamp_label": "03:15",
+    "corridor": "Ambaji",
+    "cpi": 0.392,
+    "flow_rate": 3387.9,
+    "transport_burst": 0.43,
+    "chokepoint_density": 0.515,
+    "slope": 0.0001,
+    "time_to_breach": null,
+    "prediction_fired": false,
+    "alert": {
+      "type": "none",
+      "message": "",
+      "severity": "none"
+    },
+    "phase": "normal"
+  },
+  {
+    "index": 40,
+    "timestamp_s": 200,
+    "timestamp_label": "03:20",
+    "corridor": "Ambaji",
+    "cpi": 0.414,
+    "flow_rate": 3442.2,
+    "transport_burst": 0.457,
+    "chokepoint_density": 0.48,
+    "slope": -0.00881,
+    "time_to_breach": null,
+    "prediction_fired": false,
+    "alert": {
+      "type": "none",
+      "message": "",
+      "severity": "none"
+    },
+    "phase": "normal"
+  },
+  {
+    "index": 41,
+    "timestamp_s": 205,
+    "timestamp_label": "03:24",
+    "corridor": "Ambaji",
+    "cpi": 0.39,
+    "flow_rate": 3384.6,
+    "transport_burst": 0.436,
+    "chokepoint_density": 0.434,
+    "slope": 0.01068,
+    "time_to_breach": null,
+    "prediction_fired": false,
+    "alert": {
+      "type": "none",
+      "message": "",
+      "severity": "none"
+    },
+    "phase": "normal"
+  },
+  {
+    "index": 42,
+    "timestamp_s": 210,
+    "timestamp_label": "03:30",
+    "corridor": "Ambaji",
+    "cpi": 0.39,
+    "flow_rate": 3567.4,
+    "transport_burst": 0.406,
+    "chokepoint_density": 0.482,
+    "slope": 0.01624,
+    "time_to_breach": null,
+    "prediction_fired": false,
+    "alert": {
+      "type": "none",
+      "message": "",
+      "severity": "none"
+    },
+    "phase": "normal"
+  },
+  {
+    "index": 43,
+    "timestamp_s": 215,
+    "timestamp_label": "03:35",
+    "corridor": "Ambaji",
+    "cpi": 0.385,
+    "flow_rate": 3258.9,
+    "transport_burst": 0.414,
+    "chokepoint_density": 0.483,
+    "slope": 0.00917,
+    "time_to_breach": null,
+    "prediction_fired": false,
+    "alert": {
+      "type": "none",
+      "message": "",
+      "severity": "none"
+    },
+    "phase": "normal"
+  },
+  {
+    "index": 44,
+    "timestamp_s": 220,
+    "timestamp_label": "03:39",
+    "corridor": "Ambaji",
+    "cpi": 0.414,
+    "flow_rate": 3459.7,
+    "transport_burst": 0.408,
+    "chokepoint_density": 0.481,
+    "slope": 0.00272,
+    "time_to_breach": null,
+    "prediction_fired": false,
+    "alert": {
+      "type": "none",
+      "message": "",
+      "severity": "none"
+    },
+    "phase": "normal"
+  },
+  {
+    "index": 45,
+    "timestamp_s": 225,
+    "timestamp_label": "03:45",
+    "corridor": "Ambaji",
+    "cpi": 0.407,
+    "flow_rate": 3285.1,
+    "transport_burst": 0.442,
+    "chokepoint_density": 0.514,
+    "slope": 0.00956,
+    "time_to_breach": null,
+    "prediction_fired": false,
+    "alert": {
+      "type": "none",
+      "message": "",
+      "severity": "none"
+    },
+    "phase": "normal"
+  },
+  {
+    "index": 46,
+    "timestamp_s": 230,
+    "timestamp_label": "03:50",
+    "corridor": "Ambaji",
+    "cpi": 0.411,
+    "flow_rate": 3501.6,
+    "transport_burst": 0.415,
+    "chokepoint_density": 0.471,
+    "slope": 0.00086,
+    "time_to_breach": null,
+    "prediction_fired": false,
+    "alert": {
+      "type": "none",
+      "message": "",
+      "severity": "none"
+    },
+    "phase": "normal"
+  },
+  {
+    "index": 47,
+    "timestamp_s": 235,
+    "timestamp_label": "03:54",
+    "corridor": "Ambaji",
+    "cpi": 0.413,
+    "flow_rate": 3532.9,
+    "transport_burst": 0.435,
+    "chokepoint_density": 0.467,
+    "slope": -0.00221,
+    "time_to_breach": null,
+    "prediction_fired": false,
+    "alert": {
+      "type": "none",
+      "message": "",
+      "severity": "none"
+    },
+    "phase": "normal"
+  },
+  {
+    "index": 48,
+    "timestamp_s": 240,
+    "timestamp_label": "04:00",
+    "corridor": "Ambaji",
+    "cpi": 0.396,
+    "flow_rate": 3485.9,
+    "transport_burst": 0.377,
+    "chokepoint_density": 0.473,
+    "slope": 0.00934,
+    "time_to_breach": null,
+    "prediction_fired": false,
+    "alert": {
+      "type": "none",
+      "message": "",
+      "severity": "none"
+    },
+    "phase": "normal"
+  },
+  {
+    "index": 49,
+    "timestamp_s": 245,
+    "timestamp_label": "04:04",
+    "corridor": "Ambaji",
+    "cpi": 0.431,
+    "flow_rate": 3543.1,
+    "transport_burst": 0.485,
+    "chokepoint_density": 0.492,
+    "slope": -0.00615,
+    "time_to_breach": null,
+    "prediction_fired": false,
+    "alert": {
+      "type": "none",
+      "message": "",
+      "severity": "none"
+    },
+    "phase": "normal"
+  },
+  {
+    "index": 50,
+    "timestamp_s": 250,
+    "timestamp_label": "04:10",
+    "corridor": "Ambaji",
+    "cpi": 0.408,
+    "flow_rate": 3601.5,
+    "transport_burst": 0.468,
+    "chokepoint_density": 0.496,
+    "slope": 0.01894,
+    "time_to_breach": null,
+    "prediction_fired": false,
+    "alert": {
+      "type": "none",
+      "message": "",
+      "severity": "none"
+    },
+    "phase": "normal"
+  },
+  {
+    "index": 51,
+    "timestamp_s": 255,
+    "timestamp_label": "04:15",
+    "corridor": "Ambaji",
+    "cpi": 0.418,
+    "flow_rate": 3552.8,
+    "transport_burst": 0.459,
+    "chokepoint_density": 0.488,
+    "slope": 0.01231,
+    "time_to_breach": null,
+    "prediction_fired": false,
+    "alert": {
+      "type": "none",
+      "message": "",
+      "severity": "none"
+    },
+    "phase": "normal"
+  },
+  {
+    "index": 52,
+    "timestamp_s": 260,
+    "timestamp_label": "04:19",
+    "corridor": "Ambaji",
+    "cpi": 0.44,
+    "flow_rate": 3437.3,
+    "transport_burst": 0.457,
+    "chokepoint_density": 0.514,
+    "slope": 2e-05,
+    "time_to_breach": null,
+    "prediction_fired": false,
+    "alert": {
+      "type": "none",
+      "message": "",
+      "severity": "none"
+    },
+    "phase": "normal"
+  },
+  {
+    "index": 53,
+    "timestamp_s": 265,
+    "timestamp_label": "04:25",
+    "corridor": "Ambaji",
+    "cpi": 0.408,
+    "flow_rate": 3263.0,
+    "transport_burst": 0.396,
+    "chokepoint_density": 0.485,
+    "slope": 0.0079,
+    "time_to_breach": null,
+    "prediction_fired": false,
+    "alert": {
+      "type": "none",
+      "message": "",
+      "severity": "none"
+    },
+    "phase": "normal"
+  },
+  {
+    "index": 54,
+    "timestamp_s": 270,
+    "timestamp_label": "04:30",
+    "corridor": "Ambaji",
+    "cpi": 0.432,
+    "flow_rate": 3468.8,
+    "transport_burst": 0.43,
+    "chokepoint_density": 0.46,
+    "slope": 0.00285,
+    "time_to_breach": null,
+    "prediction_fired": false,
+    "alert": {
+      "type": "none",
+      "message": "",
+      "severity": "none"
+    },
+    "phase": "normal"
+  },
+  {
+    "index": 55,
+    "timestamp_s": 275,
+    "timestamp_label": "04:34",
+    "corridor": "Ambaji",
+    "cpi": 0.435,
+    "flow_rate": 3637.4,
+    "transport_burst": 0.483,
+    "chokepoint_density": 0.498,
+    "slope": 0.00683,
+    "time_to_breach": null,
+    "prediction_fired": false,
+    "alert": {
+      "type": "none",
+      "message": "",
+      "severity": "none"
+    },
+    "phase": "normal"
+  },
+  {
+    "index": 56,
+    "timestamp_s": 280,
+    "timestamp_label": "04:40",
+    "corridor": "Ambaji",
+    "cpi": 0.432,
+    "flow_rate": 3478.8,
+    "transport_burst": 0.448,
+    "chokepoint_density": 0.489,
+    "slope": -0.0052,
+    "time_to_breach": null,
+    "prediction_fired": false,
+    "alert": {
+      "type": "none",
+      "message": "",
+      "severity": "none"
+    },
+    "phase": "normal"
+  },
+  {
+    "index": 57,
+    "timestamp_s": 285,
+    "timestamp_label": "04:45",
+    "corridor": "Ambaji",
+    "cpi": 0.438,
+    "flow_rate": 3580.7,
+    "transport_burst": 0.456,
+    "chokepoint_density": 0.49,
+    "slope": 0.00378,
+    "time_to_breach": null,
+    "prediction_fired": false,
+    "alert": {
+      "type": "none",
+      "message": "",
+      "severity": "none"
+    },
+    "phase": "normal"
+  },
+  {
+    "index": 58,
+    "timestamp_s": 290,
+    "timestamp_label": "04:49",
+    "corridor": "Ambaji",
+    "cpi": 0.46,
+    "flow_rate": 3628.7,
+    "transport_burst": 0.468,
+    "chokepoint_density": 0.505,
+    "slope": -0.00367,
+    "time_to_breach": null,
+    "prediction_fired": false,
+    "alert": {
+      "type": "none",
+      "message": "",
+      "severity": "none"
+    },
+    "phase": "normal"
+  },
+  {
+    "index": 59,
+    "timestamp_s": 295,
+    "timestamp_label": "04:55",
+    "corridor": "Ambaji",
+    "cpi": 0.427,
+    "flow_rate": 3512.1,
+    "transport_burst": 0.459,
+    "chokepoint_density": 0.534,
+    "slope": 0.01286,
+    "time_to_breach": null,
+    "prediction_fired": false,
+    "alert": {
+      "type": "none",
+      "message": "",
+      "severity": "none"
+    },
+    "phase": "normal"
+  },
+  {
+    "index": 60,
+    "timestamp_s": 300,
+    "timestamp_label": "05:00",
+    "corridor": "Ambaji",
+    "cpi": 0.457,
+    "flow_rate": 3553.8,
+    "transport_burst": 0.496,
+    "chokepoint_density": 0.493,
+    "slope": 0.0017,
+    "time_to_breach": null,
+    "prediction_fired": false,
+    "alert": {
+      "type": "none",
+      "message": "",
+      "severity": "none"
+    },
+    "phase": "surge"
+  },
+  {
+    "index": 61,
+    "timestamp_s": 305,
+    "timestamp_label": "05:04",
+    "corridor": "Ambaji",
+    "cpi": 0.455,
+    "flow_rate": 3540.3,
+    "transport_burst": 0.527,
+    "chokepoint_density": 0.525,
+    "slope": -0.0047,
+    "time_to_breach": null,
+    "prediction_fired": false,
+    "alert": {
+      "type": "none",
+      "message": "",
+      "severity": "none"
+    },
+    "phase": "surge"
+  },
+  {
+    "index": 62,
+    "timestamp_s": 310,
+    "timestamp_label": "05:10",
+    "corridor": "Ambaji",
+    "cpi": 0.461,
+    "flow_rate": 3591.8,
+    "transport_burst": 0.482,
+    "chokepoint_density": 0.527,
+    "slope": 0.00393,
+    "time_to_breach": null,
+    "prediction_fired": false,
+    "alert": {
+      "type": "none",
+      "message": "",
+      "severity": "none"
+    },
+    "phase": "surge"
+  },
+  {
+    "index": 63,
+    "timestamp_s": 315,
+    "timestamp_label": "05:15",
+    "corridor": "Ambaji",
+    "cpi": 0.434,
+    "flow_rate": 3442.0,
+    "transport_burst": 0.482,
+    "chokepoint_density": 0.528,
+    "slope": 0.02035,
+    "time_to_breach": null,
+    "prediction_fired": false,
+    "alert": {
+      "type": "none",
+      "message": "",
+      "severity": "none"
+    },
+    "phase": "surge"
+  },
+  {
+    "index": 64,
+    "timestamp_s": 320,
+    "timestamp_label": "05:19",
+    "corridor": "Ambaji",
+    "cpi": 0.485,
+    "flow_rate": 3518.4,
+    "transport_burst": 0.518,
+    "chokepoint_density": 0.493,
+    "slope": 0.00383,
+    "time_to_breach": null,
+    "prediction_fired": false,
+    "alert": {
+      "type": "none",
+      "message": "",
+      "severity": "none"
+    },
+    "phase": "surge"
+  },
+  {
+    "index": 65,
+    "timestamp_s": 325,
+    "timestamp_label": "05:25",
+    "corridor": "Ambaji",
+    "cpi": 0.471,
+    "flow_rate": 3557.3,
+    "transport_burst": 0.539,
+    "chokepoint_density": 0.536,
+    "slope": -0.00399,
+    "time_to_breach": null,
+    "prediction_fired": false,
+    "alert": {
+      "type": "none",
+      "message": "",
+      "severity": "none"
+    },
+    "phase": "surge"
+  },
+  {
+    "index": 66,
+    "timestamp_s": 330,
+    "timestamp_label": "05:30",
+    "corridor": "Ambaji",
+    "cpi": 0.476,
+    "flow_rate": 3609.9,
+    "transport_burst": 0.496,
+    "chokepoint_density": 0.517,
+    "slope": 0.0089,
+    "time_to_breach": null,
+    "prediction_fired": false,
+    "alert": {
+      "type": "none",
+      "message": "",
+      "severity": "none"
+    },
+    "phase": "surge"
+  },
+  {
+    "index": 67,
+    "timestamp_s": 335,
+    "timestamp_label": "05:34",
+    "corridor": "Ambaji",
+    "cpi": 0.46,
+    "flow_rate": 3654.6,
+    "transport_burst": 0.527,
+    "chokepoint_density": 0.5,
+    "slope": 0.01112,
+    "time_to_breach": null,
+    "prediction_fired": false,
+    "alert": {
+      "type": "none",
+      "message": "",
+      "severity": "none"
+    },
+    "phase": "surge"
+  },
+  {
+    "index": 68,
+    "timestamp_s": 340,
+    "timestamp_label": "05:40",
+    "corridor": "Ambaji",
+    "cpi": 0.484,
+    "flow_rate": 3638.6,
+    "transport_burst": 0.515,
+    "chokepoint_density": 0.533,
+    "slope": 0.0,
+    "time_to_breach": null,
+    "prediction_fired": false,
+    "alert": {
+      "type": "none",
+      "message": "",
+      "severity": "none"
+    },
+    "phase": "surge"
+  },
+  {
+    "index": 69,
+    "timestamp_s": 345,
+    "timestamp_label": "05:45",
+    "corridor": "Ambaji",
+    "cpi": 0.507,
+    "flow_rate": 3844.2,
+    "transport_burst": 0.511,
+    "chokepoint_density": 0.532,
+    "slope": -0.0056,
+    "time_to_breach": null,
+    "prediction_fired": false,
+    "alert": {
+      "type": "none",
+      "message": "",
+      "severity": "none"
+    },
+    "phase": "surge"
+  },
+  {
+    "index": 70,
+    "timestamp_s": 350,
+    "timestamp_label": "05:49",
+    "corridor": "Ambaji",
+    "cpi": 0.506,
+    "flow_rate": 3754.2,
+    "transport_burst": 0.526,
+    "chokepoint_density": 0.54,
+    "slope": 0.00213,
+    "time_to_breach": null,
+    "prediction_fired": false,
+    "alert": {
+      "type": "none",
+      "message": "",
+      "severity": "none"
+    },
+    "phase": "surge"
+  },
+  {
+    "index": 71,
+    "timestamp_s": 355,
+    "timestamp_label": "05:55",
+    "corridor": "Ambaji",
+    "cpi": 0.494,
+    "flow_rate": 3800.2,
+    "transport_burst": 0.501,
+    "chokepoint_density": 0.553,
+    "slope": 0.00774,
+    "time_to_breach": null,
+    "prediction_fired": false,
+    "alert": {
+      "type": "none",
+      "message": "",
+      "severity": "none"
+    },
+    "phase": "surge"
+  },
+  {
+    "index": 72,
+    "timestamp_s": 360,
+    "timestamp_label": "06:00",
+    "corridor": "Ambaji",
+    "cpi": 0.499,
+    "flow_rate": 3668.3,
+    "transport_burst": 0.485,
+    "chokepoint_density": 0.524,
+    "slope": 0.00111,
+    "time_to_breach": null,
+    "prediction_fired": false,
+    "alert": {
+      "type": "none",
+      "message": "",
+      "severity": "none"
+    },
+    "phase": "surge"
+  },
+  {
+    "index": 73,
+    "timestamp_s": 365,
+    "timestamp_label": "06:04",
+    "corridor": "Ambaji",
+    "cpi": 0.515,
+    "flow_rate": 3792.2,
+    "transport_burst": 0.56,
+    "chokepoint_density": 0.594,
+    "slope": 0.00122,
+    "time_to_breach": null,
+    "prediction_fired": false,
+    "alert": {
+      "type": "none",
+      "message": "",
+      "severity": "none"
+    },
+    "phase": "surge"
+  },
+  {
+    "index": 74,
+    "timestamp_s": 370,
+    "timestamp_label": "06:10",
+    "corridor": "Ambaji",
+    "cpi": 0.491,
+    "flow_rate": 3686.5,
+    "transport_burst": 0.501,
+    "chokepoint_density": 0.505,
+    "slope": 0.00977,
+    "time_to_breach": null,
+    "prediction_fired": false,
+    "alert": {
+      "type": "none",
+      "message": "",
+      "severity": "none"
+    },
+    "phase": "surge"
+  },
+  {
+    "index": 75,
+    "timestamp_s": 375,
+    "timestamp_label": "06:15",
+    "corridor": "Ambaji",
+    "cpi": 0.517,
+    "flow_rate": 3762.0,
+    "transport_burst": 0.503,
+    "chokepoint_density": 0.535,
+    "slope": 0.01058,
+    "time_to_breach": null,
+    "prediction_fired": false,
+    "alert": {
+      "type": "none",
+      "message": "",
+      "severity": "none"
+    },
+    "phase": "surge"
+  },
+  {
+    "index": 76,
+    "timestamp_s": 380,
+    "timestamp_label": "06:19",
+    "corridor": "Ambaji",
+    "cpi": 0.516,
+    "flow_rate": 3726.2,
+    "transport_burst": 0.512,
+    "chokepoint_density": 0.569,
+    "slope": 0.00248,
+    "time_to_breach": null,
+    "prediction_fired": false,
+    "alert": {
+      "type": "none",
+      "message": "",
+      "severity": "none"
+    },
+    "phase": "surge"
+  },
+  {
+    "index": 77,
+    "timestamp_s": 385,
+    "timestamp_label": "06:25",
+    "corridor": "Ambaji",
+    "cpi": 0.529,
+    "flow_rate": 3904.5,
+    "transport_burst": 0.549,
+    "chokepoint_density": 0.585,
+    "slope": 0.00045,
+    "time_to_breach": null,
+    "prediction_fired": false,
+    "alert": {
+      "type": "none",
+      "message": "",
+      "severity": "none"
+    },
+    "phase": "surge"
+  },
+  {
+    "index": 78,
+    "timestamp_s": 390,
+    "timestamp_label": "06:30",
+    "corridor": "Ambaji",
+    "cpi": 0.541,
+    "flow_rate": 3806.0,
+    "transport_burst": 0.53,
+    "chokepoint_density": 0.588,
+    "slope": 0.00334,
+    "time_to_breach": null,
+    "prediction_fired": false,
+    "alert": {
+      "type": "none",
+      "message": "",
+      "severity": "none"
+    },
+    "phase": "surge"
+  },
+  {
+    "index": 79,
+    "timestamp_s": 395,
+    "timestamp_label": "06:34",
+    "corridor": "Ambaji",
+    "cpi": 0.532,
+    "flow_rate": 3742.3,
+    "transport_burst": 0.547,
+    "chokepoint_density": 0.546,
+    "slope": 0.00088,
+    "time_to_breach": null,
+    "prediction_fired": false,
+    "alert": {
+      "type": "none",
+      "message": "",
+      "severity": "none"
+    },
+    "phase": "surge"
+  },
+  {
+    "index": 80,
+    "timestamp_s": 400,
+    "timestamp_label": "06:40",
+    "corridor": "Ambaji",
+    "cpi": 0.529,
+    "flow_rate": 3861.7,
+    "transport_burst": 0.478,
+    "chokepoint_density": 0.564,
+    "slope": 0.00787,
+    "time_to_breach": null,
+    "prediction_fired": false,
+    "alert": {
+      "type": "none",
+      "message": "",
+      "severity": "none"
+    },
+    "phase": "surge"
+  },
+  {
+    "index": 81,
+    "timestamp_s": 405,
+    "timestamp_label": "06:45",
+    "corridor": "Ambaji",
+    "cpi": 0.534,
+    "flow_rate": 3949.5,
+    "transport_burst": 0.55,
+    "chokepoint_density": 0.548,
+    "slope": 0.00424,
+    "time_to_breach": null,
+    "prediction_fired": false,
+    "alert": {
+      "type": "none",
+      "message": "",
+      "severity": "none"
+    },
+    "phase": "surge"
+  },
+  {
+    "index": 82,
+    "timestamp_s": 410,
+    "timestamp_label": "06:49",
+    "corridor": "Ambaji",
+    "cpi": 0.554,
+    "flow_rate": 3781.5,
+    "transport_burst": 0.541,
+    "chokepoint_density": 0.559,
+    "slope": 0.00208,
+    "time_to_breach": null,
+    "prediction_fired": false,
+    "alert": {
+      "type": "none",
+      "message": "",
+      "severity": "none"
+    },
+    "phase": "surge"
+  },
+  {
+    "index": 83,
+    "timestamp_s": 415,
+    "timestamp_label": "06:55",
+    "corridor": "Ambaji",
+    "cpi": 0.553,
+    "flow_rate": 3917.5,
+    "transport_burst": 0.576,
+    "chokepoint_density": 0.575,
+    "slope": 0.00248,
+    "time_to_breach": null,
+    "prediction_fired": false,
+    "alert": {
+      "type": "none",
+      "message": "",
+      "severity": "none"
+    },
+    "phase": "surge"
+  },
+  {
+    "index": 84,
+    "timestamp_s": 420,
+    "timestamp_label": "07:00",
+    "corridor": "Ambaji",
+    "cpi": 0.54,
+    "flow_rate": 3940.4,
+    "transport_burst": 0.552,
+    "chokepoint_density": 0.592,
+    "slope": 0.00644,
+    "time_to_breach": null,
+    "prediction_fired": false,
+    "alert": {
+      "type": "none",
+      "message": "",
+      "severity": "none"
+    },
+    "phase": "surge"
+  },
+  {
+    "index": 85,
+    "timestamp_s": 425,
+    "timestamp_label": "07:04",
+    "corridor": "Ambaji",
+    "cpi": 0.56,
+    "flow_rate": 3930.4,
+    "transport_burst": 0.551,
+    "chokepoint_density": 0.575,
+    "slope": -0.00238,
+    "time_to_breach": null,
+    "prediction_fired": false,
+    "alert": {
+      "type": "none",
+      "message": "",
+      "severity": "none"
+    },
+    "phase": "surge"
+  },
+  {
+    "index": 86,
+    "timestamp_s": 430,
+    "timestamp_label": "07:10",
+    "corridor": "Ambaji",
+    "cpi": 0.574,
+    "flow_rate": 4038.4,
+    "transport_burst": 0.592,
+    "chokepoint_density": 0.628,
+    "slope": 1e-05,
+    "time_to_breach": null,
+    "prediction_fired": false,
+    "alert": {
+      "type": "none",
+      "message": "",
+      "severity": "none"
+    },
+    "phase": "surge"
+  },
+  {
+    "index": 87,
+    "timestamp_s": 435,
+    "timestamp_label": "07:15",
+    "corridor": "Ambaji",
+    "cpi": 0.568,
+    "flow_rate": 3962.7,
+    "transport_burst": 0.608,
+    "chokepoint_density": 0.545,
+    "slope": 0.00667,
+    "time_to_breach": null,
+    "prediction_fired": false,
+    "alert": {
+      "type": "none",
+      "message": "",
+      "severity": "none"
+    },
+    "phase": "surge"
+  },
+  {
+    "index": 88,
+    "timestamp_s": 440,
+    "timestamp_label": "07:19",
+    "corridor": "Ambaji",
+    "cpi": 0.556,
+    "flow_rate": 3690.3,
+    "transport_burst": 0.5,
+    "chokepoint_density": 0.545,
+    "slope": 0.01474,
+    "time_to_breach": null,
+    "prediction_fired": false,
+    "alert": {
+      "type": "none",
+      "message": "",
+      "severity": "none"
+    },
+    "phase": "surge"
+  },
+  {
+    "index": 89,
+    "timestamp_s": 445,
+    "timestamp_label": "07:25",
+    "corridor": "Ambaji",
+    "cpi": 0.567,
+    "flow_rate": 3938.8,
+    "transport_burst": 0.53,
+    "chokepoint_density": 0.591,
+    "slope": 0.00365,
+    "time_to_breach": null,
+    "prediction_fired": false,
+    "alert": {
+      "type": "none",
+      "message": "",
+      "severity": "none"
+    },
+    "phase": "surge"
+  },
+  {
+    "index": 90,
+    "timestamp_s": 450,
+    "timestamp_label": "07:30",
+    "corridor": "Ambaji",
+    "cpi": 0.598,
+    "flow_rate": 3965.4,
+    "transport_burst": 0.562,
+    "chokepoint_density": 0.599,
+    "slope": -0.00059,
+    "time_to_breach": null,
+    "prediction_fired": false,
+    "alert": {
+      "type": "none",
+      "message": "",
+      "severity": "none"
+    },
+    "phase": "surge"
+  },
+  {
+    "index": 91,
+    "timestamp_s": 455,
+    "timestamp_label": "07:34",
+    "corridor": "Ambaji",
+    "cpi": 0.604,
+    "flow_rate": 4083.8,
+    "transport_burst": 0.555,
+    "chokepoint_density": 0.589,
+    "slope": -0.00341,
+    "time_to_breach": null,
+    "prediction_fired": false,
+    "alert": {
+      "type": "none",
+      "message": "",
+      "severity": "none"
+    },
+    "phase": "surge"
+  },
+  {
+    "index": 92,
+    "timestamp_s": 460,
+    "timestamp_label": "07:40",
+    "corridor": "Ambaji",
+    "cpi": 0.6,
+    "flow_rate": 4095.7,
+    "transport_burst": 0.579,
+    "chokepoint_density": 0.616,
+    "slope": -0.00043,
+    "time_to_breach": null,
+    "prediction_fired": false,
+    "alert": {
+      "type": "none",
+      "message": "",
+      "severity": "none"
+    },
+    "phase": "surge"
+  },
+  {
+    "index": 93,
+    "timestamp_s": 465,
+    "timestamp_label": "07:45",
+    "corridor": "Ambaji",
+    "cpi": 0.595,
+    "flow_rate": 4059.6,
+    "transport_burst": 0.616,
+    "chokepoint_density": 0.593,
+    "slope": 0.00373,
+    "time_to_breach": null,
+    "prediction_fired": false,
+    "alert": {
+      "type": "none",
+      "message": "",
+      "severity": "none"
+    },
+    "phase": "surge"
+  },
+  {
+    "index": 94,
+    "timestamp_s": 470,
+    "timestamp_label": "07:49",
+    "corridor": "Ambaji",
+    "cpi": 0.588,
+    "flow_rate": 4085.4,
+    "transport_burst": 0.559,
+    "chokepoint_density": 0.598,
+    "slope": 0.00116,
+    "time_to_breach": null,
+    "prediction_fired": false,
+    "alert": {
+      "type": "none",
+      "message": "",
+      "severity": "none"
+    },
+    "phase": "surge"
+  },
+  {
+    "index": 95,
+    "timestamp_s": 475,
+    "timestamp_label": "07:55",
+    "corridor": "Ambaji",
+    "cpi": 0.618,
+    "flow_rate": 3995.7,
+    "transport_burst": 0.575,
+    "chokepoint_density": 0.63,
+    "slope": -0.00493,
+    "time_to_breach": null,
+    "prediction_fired": false,
+    "alert": {
+      "type": "none",
+      "message": "",
+      "severity": "none"
+    },
+    "phase": "surge"
+  },
+  {
+    "index": 96,
+    "timestamp_s": 480,
+    "timestamp_label": "08:00",
+    "corridor": "Ambaji",
+    "cpi": 0.609,
+    "flow_rate": 4094.7,
+    "transport_burst": 0.564,
+    "chokepoint_density": 0.63,
+    "slope": 0.0109,
+    "time_to_breach": 20.0,
+    "prediction_fired": true,
+    "alert": {
+      "type": "predicted_breach",
+      "message": "WARNING: Breach predicted in 20.0 min for Ambaji",
+      "severity": "high"
+    },
+    "phase": "critical"
+  },
+  {
+    "index": 97,
+    "timestamp_s": 485,
+    "timestamp_label": "08:05",
+    "corridor": "Ambaji",
+    "cpi": 0.591,
+    "flow_rate": 3901.5,
+    "transport_burst": 0.596,
+    "chokepoint_density": 0.567,
+    "slope": 0.01092,
+    "time_to_breach": 19.8,
+    "prediction_fired": false,
+    "alert": {
+      "type": "predicted_breach",
+      "message": "WARNING: Breach predicted in 19.8 min for Ambaji",
+      "severity": "high"
+    },
+    "phase": "critical"
+  },
+  {
+    "index": 98,
+    "timestamp_s": 490,
+    "timestamp_label": "08:09",
+    "corridor": "Ambaji",
+    "cpi": 0.621,
+    "flow_rate": 4186.5,
+    "transport_burst": 0.591,
+    "chokepoint_density": 0.612,
+    "slope": 0.00096,
+    "time_to_breach": 19.7,
+    "prediction_fired": false,
+    "alert": {
+      "type": "predicted_breach",
+      "message": "WARNING: Breach predicted in 19.7 min for Ambaji",
+      "severity": "high"
+    },
+    "phase": "critical"
+  },
+  {
+    "index": 99,
+    "timestamp_s": 495,
+    "timestamp_label": "08:15",
+    "corridor": "Ambaji",
+    "cpi": 0.639,
+    "flow_rate": 4137.1,
+    "transport_burst": 0.619,
+    "chokepoint_density": 0.611,
+    "slope": -0.00016,
+    "time_to_breach": null,
+    "prediction_fired": false,
+    "alert": {
+      "type": "predicted_breach",
+      "message": "WARNING: Breach predicted in None min for Ambaji",
+      "severity": "high"
+    },
+    "phase": "critical"
+  },
+  {
+    "index": 100,
+    "timestamp_s": 500,
+    "timestamp_label": "08:20",
+    "corridor": "Ambaji",
+    "cpi": 0.626,
+    "flow_rate": 4127.0,
+    "transport_burst": 0.576,
+    "chokepoint_density": 0.629,
+    "slope": 0.01091,
+    "time_to_breach": 19.3,
+    "prediction_fired": false,
+    "alert": {
+      "type": "predicted_breach",
+      "message": "WARNING: Breach predicted in 19.3 min for Ambaji",
+      "severity": "high"
+    },
+    "phase": "critical"
+  },
+  {
+    "index": 101,
+    "timestamp_s": 505,
+    "timestamp_label": "08:24",
+    "corridor": "Ambaji",
+    "cpi": 0.636,
+    "flow_rate": 4237.0,
+    "transport_burst": 0.629,
+    "chokepoint_density": 0.637,
+    "slope": 0.00482,
+    "time_to_breach": 19.2,
+    "prediction_fired": false,
+    "alert": {
+      "type": "predicted_breach",
+      "message": "WARNING: Breach predicted in 19.2 min for Ambaji",
+      "severity": "high"
+    },
+    "phase": "critical"
+  },
+  {
+    "index": 102,
+    "timestamp_s": 510,
+    "timestamp_label": "08:30",
+    "corridor": "Ambaji",
+    "cpi": 0.64,
+    "flow_rate": 4261.9,
+    "transport_burst": 0.613,
+    "chokepoint_density": 0.602,
+    "slope": 0.00383,
+    "time_to_breach": 19.0,
+    "prediction_fired": false,
+    "alert": {
+      "type": "predicted_breach",
+      "message": "WARNING: Breach predicted in 19.0 min for Ambaji",
+      "severity": "high"
+    },
+    "phase": "critical"
+  },
+  {
+    "index": 103,
+    "timestamp_s": 515,
+    "timestamp_label": "08:35",
+    "corridor": "Ambaji",
+    "cpi": 0.619,
+    "flow_rate": 4119.7,
+    "transport_burst": 0.606,
+    "chokepoint_density": 0.634,
+    "slope": 0.01274,
+    "time_to_breach": 18.8,
+    "prediction_fired": false,
+    "alert": {
+      "type": "predicted_breach",
+      "message": "WARNING: Breach predicted in 18.8 min for Ambaji",
+      "severity": "high"
+    },
+    "phase": "critical"
+  },
+  {
+    "index": 104,
+    "timestamp_s": 520,
+    "timestamp_label": "08:39",
+    "corridor": "Ambaji",
+    "cpi": 0.658,
+    "flow_rate": 4239.1,
+    "transport_burst": 0.598,
+    "chokepoint_density": 0.603,
+    "slope": -0.00301,
+    "time_to_breach": null,
+    "prediction_fired": false,
+    "alert": {
+      "type": "predicted_breach",
+      "message": "WARNING: Breach predicted in None min for Ambaji",
+      "severity": "high"
+    },
+    "phase": "critical"
+  },
+  {
+    "index": 105,
+    "timestamp_s": 525,
+    "timestamp_label": "08:45",
+    "corridor": "Ambaji",
+    "cpi": 0.635,
+    "flow_rate": 4225.1,
+    "transport_burst": 0.602,
+    "chokepoint_density": 0.63,
+    "slope": 0.01034,
+    "time_to_breach": 18.5,
+    "prediction_fired": false,
+    "alert": {
+      "type": "predicted_breach",
+      "message": "WARNING: Breach predicted in 18.5 min for Ambaji",
+      "severity": "high"
+    },
+    "phase": "critical"
+  },
+  {
+    "index": 106,
+    "timestamp_s": 530,
+    "timestamp_label": "08:50",
+    "corridor": "Ambaji",
+    "cpi": 0.668,
+    "flow_rate": 4367.3,
+    "transport_burst": 0.615,
+    "chokepoint_density": 0.632,
+    "slope": -0.00172,
+    "time_to_breach": null,
+    "prediction_fired": false,
+    "alert": {
+      "type": "predicted_breach",
+      "message": "WARNING: Breach predicted in None min for Ambaji",
+      "severity": "high"
+    },
+    "phase": "critical"
+  },
+  {
+    "index": 107,
+    "timestamp_s": 535,
+    "timestamp_label": "08:54",
+    "corridor": "Ambaji",
+    "cpi": 0.641,
+    "flow_rate": 4247.7,
+    "transport_burst": 0.641,
+    "chokepoint_density": 0.622,
+    "slope": 0.0091,
+    "time_to_breach": 18.2,
+    "prediction_fired": false,
+    "alert": {
+      "type": "predicted_breach",
+      "message": "WARNING: Breach predicted in 18.2 min for Ambaji",
+      "severity": "high"
+    },
+    "phase": "critical"
+  },
+  {
+    "index": 108,
+    "timestamp_s": 540,
+    "timestamp_label": "09:00",
+    "corridor": "Ambaji",
+    "cpi": 0.678,
+    "flow_rate": 4091.0,
+    "transport_burst": 0.643,
+    "chokepoint_density": 0.646,
+    "slope": -0.00206,
+    "time_to_breach": null,
+    "prediction_fired": false,
+    "alert": {
+      "type": "predicted_breach",
+      "message": "WARNING: Breach predicted in None min for Ambaji",
+      "severity": "high"
+    },
+    "phase": "critical"
+  },
+  {
+    "index": 109,
+    "timestamp_s": 545,
+    "timestamp_label": "09:05",
+    "corridor": "Ambaji",
+    "cpi": 0.686,
+    "flow_rate": 4414.8,
+    "transport_burst": 0.638,
+    "chokepoint_density": 0.646,
+    "slope": -0.00254,
+    "time_to_breach": null,
+    "prediction_fired": false,
+    "alert": {
+      "type": "predicted_breach",
+      "message": "WARNING: Breach predicted in None min for Ambaji",
+      "severity": "high"
+    },
+    "phase": "critical"
+  },
+  {
+    "index": 110,
+    "timestamp_s": 550,
+    "timestamp_label": "09:09",
+    "corridor": "Ambaji",
+    "cpi": 0.668,
+    "flow_rate": 4153.1,
+    "transport_burst": 0.665,
+    "chokepoint_density": 0.658,
+    "slope": 0.00982,
+    "time_to_breach": 17.7,
+    "prediction_fired": false,
+    "alert": {
+      "type": "predicted_breach",
+      "message": "WARNING: Breach predicted in 17.7 min for Ambaji",
+      "severity": "high"
+    },
+    "phase": "critical"
+  },
+  {
+    "index": 111,
+    "timestamp_s": 555,
+    "timestamp_label": "09:15",
+    "corridor": "Ambaji",
+    "cpi": 0.666,
+    "flow_rate": 4450.7,
+    "transport_burst": 0.679,
+    "chokepoint_density": 0.64,
+    "slope": 0.00534,
+    "time_to_breach": 17.5,
+    "prediction_fired": false,
+    "alert": {
+      "type": "predicted_breach",
+      "message": "WARNING: Breach predicted in 17.5 min for Ambaji",
+      "severity": "high"
+    },
+    "phase": "critical"
+  },
+  {
+    "index": 112,
+    "timestamp_s": 560,
+    "timestamp_label": "09:20",
+    "corridor": "Ambaji",
+    "cpi": 0.673,
+    "flow_rate": 4323.8,
+    "transport_burst": 0.612,
+    "chokepoint_density": 0.64,
+    "slope": 0.0124,
+    "time_to_breach": 17.3,
+    "prediction_fired": false,
+    "alert": {
+      "type": "predicted_breach",
+      "message": "WARNING: Breach predicted in 17.3 min for Ambaji",
+      "severity": "high"
+    },
+    "phase": "critical"
+  },
+  {
+    "index": 113,
+    "timestamp_s": 565,
+    "timestamp_label": "09:24",
+    "corridor": "Ambaji",
+    "cpi": 0.67,
+    "flow_rate": 4457.0,
+    "transport_burst": 0.671,
+    "chokepoint_density": 0.614,
+    "slope": 0.00496,
+    "time_to_breach": 17.2,
+    "prediction_fired": false,
+    "alert": {
+      "type": "predicted_breach",
+      "message": "WARNING: Breach predicted in 17.2 min for Ambaji",
+      "severity": "high"
+    },
+    "phase": "critical"
+  },
+  {
+    "index": 114,
+    "timestamp_s": 570,
+    "timestamp_label": "09:30",
+    "corridor": "Ambaji",
+    "cpi": 0.689,
+    "flow_rate": 4243.4,
+    "transport_burst": 0.64,
+    "chokepoint_density": 0.598,
+    "slope": 0.0048,
+    "time_to_breach": 17.0,
+    "prediction_fired": false,
+    "alert": {
+      "type": "predicted_breach",
+      "message": "WARNING: Breach predicted in 17.0 min for Ambaji",
+      "severity": "high"
+    },
+    "phase": "critical"
+  },
+  {
+    "index": 115,
+    "timestamp_s": 575,
+    "timestamp_label": "09:35",
+    "corridor": "Ambaji",
+    "cpi": 0.719,
+    "flow_rate": 4327.5,
+    "transport_burst": 0.661,
+    "chokepoint_density": 0.637,
+    "slope": -8e-05,
+    "time_to_breach": null,
+    "prediction_fired": false,
+    "alert": {
+      "type": "predicted_breach",
+      "message": "WARNING: Breach predicted in None min for Ambaji",
+      "severity": "high"
+    },
+    "phase": "critical"
+  },
+  {
+    "index": 116,
+    "timestamp_s": 580,
+    "timestamp_label": "09:39",
+    "corridor": "Ambaji",
+    "cpi": 0.699,
+    "flow_rate": 4541.5,
+    "transport_burst": 0.658,
+    "chokepoint_density": 0.648,
+    "slope": 0.00769,
+    "time_to_breach": 16.7,
+    "prediction_fired": false,
+    "alert": {
+      "type": "predicted_breach",
+      "message": "WARNING: Breach predicted in 16.7 min for Ambaji",
+      "severity": "high"
+    },
+    "phase": "critical"
+  },
+  {
+    "index": 117,
+    "timestamp_s": 585,
+    "timestamp_label": "09:45",
+    "corridor": "Ambaji",
+    "cpi": 0.7,
+    "flow_rate": 4250.0,
+    "transport_burst": 0.662,
+    "chokepoint_density": 0.653,
+    "slope": 0.00727,
+    "time_to_breach": 16.5,
+    "prediction_fired": false,
+    "alert": {
+      "type": "predicted_breach",
+      "message": "WARNING: Breach predicted in 16.5 min for Ambaji",
+      "severity": "high"
+    },
+    "phase": "critical"
+  },
+  {
+    "index": 118,
+    "timestamp_s": 590,
+    "timestamp_label": "09:50",
+    "corridor": "Ambaji",
+    "cpi": 0.715,
+    "flow_rate": 4371.6,
+    "transport_burst": 0.676,
+    "chokepoint_density": 0.7,
+    "slope": -0.00218,
+    "time_to_breach": null,
+    "prediction_fired": false,
+    "alert": {
+      "type": "predicted_breach",
+      "message": "WARNING: Breach predicted in None min for Ambaji",
+      "severity": "high"
+    },
+    "phase": "critical"
+  },
+  {
+    "index": 119,
+    "timestamp_s": 595,
+    "timestamp_label": "09:54",
+    "corridor": "Ambaji",
+    "cpi": 0.736,
+    "flow_rate": 4460.6,
+    "transport_burst": 0.661,
+    "chokepoint_density": 0.726,
+    "slope": -0.00341,
+    "time_to_breach": null,
+    "prediction_fired": false,
+    "alert": {
+      "type": "predicted_breach",
+      "message": "WARNING: Breach predicted in None min for Ambaji",
+      "severity": "high"
+    },
+    "phase": "critical"
+  },
+  {
+    "index": 120,
+    "timestamp_s": 600,
+    "timestamp_label": "10:00",
+    "corridor": "Ambaji",
+    "cpi": 0.736,
+    "flow_rate": 4556.6,
+    "transport_burst": 0.638,
+    "chokepoint_density": 0.68,
+    "slope": -0.0055,
+    "time_to_breach": null,
+    "prediction_fired": false,
+    "alert": {
+      "type": "predicted_breach",
+      "message": "WARNING: Breach predicted in None min for Ambaji",
+      "severity": "high"
+    },
+    "phase": "critical"
+  },
+  {
+    "index": 121,
+    "timestamp_s": 605,
+    "timestamp_label": "10:05",
+    "corridor": "Ambaji",
+    "cpi": 0.706,
+    "flow_rate": 4229.1,
+    "transport_burst": 0.661,
+    "chokepoint_density": 0.671,
+    "slope": 0.00901,
+    "time_to_breach": 15.8,
+    "prediction_fired": false,
+    "alert": {
+      "type": "predicted_breach",
+      "message": "WARNING: Breach predicted in 15.8 min for Ambaji",
+      "severity": "high"
+    },
+    "phase": "critical"
+  },
+  {
+    "index": 122,
+    "timestamp_s": 610,
+    "timestamp_label": "10:09",
+    "corridor": "Ambaji",
+    "cpi": 0.72,
+    "flow_rate": 4361.7,
+    "transport_burst": 0.644,
+    "chokepoint_density": 0.657,
+    "slope": -0.00083,
+    "time_to_breach": null,
+    "prediction_fired": false,
+    "alert": {
+      "type": "predicted_breach",
+      "message": "WARNING: Breach predicted in None min for Ambaji",
+      "severity": "high"
+    },
+    "phase": "critical"
+  },
+  {
+    "index": 123,
+    "timestamp_s": 615,
+    "timestamp_label": "10:15",
+    "corridor": "Ambaji",
+    "cpi": 0.724,
+    "flow_rate": 4441.8,
+    "transport_burst": 0.649,
+    "chokepoint_density": 0.665,
+    "slope": -0.00014,
+    "time_to_breach": null,
+    "prediction_fired": false,
+    "alert": {
+      "type": "predicted_breach",
+      "message": "WARNING: Breach predicted in None min for Ambaji",
+      "severity": "high"
+    },
+    "phase": "critical"
+  },
+  {
+    "index": 124,
+    "timestamp_s": 620,
+    "timestamp_label": "10:20",
+    "corridor": "Ambaji",
+    "cpi": 0.728,
+    "flow_rate": 4503.3,
+    "transport_burst": 0.679,
+    "chokepoint_density": 0.682,
+    "slope": -0.00451,
+    "time_to_breach": null,
+    "prediction_fired": false,
+    "alert": {
+      "type": "predicted_breach",
+      "message": "WARNING: Breach predicted in None min for Ambaji",
+      "severity": "high"
+    },
+    "phase": "critical"
+  },
+  {
+    "index": 125,
+    "timestamp_s": 625,
+    "timestamp_label": "10:24",
+    "corridor": "Ambaji",
+    "cpi": 0.726,
+    "flow_rate": 4475.1,
+    "transport_burst": 0.689,
+    "chokepoint_density": 0.639,
+    "slope": 0.00423,
+    "time_to_breach": 15.2,
+    "prediction_fired": false,
+    "alert": {
+      "type": "predicted_breach",
+      "message": "WARNING: Breach predicted in 15.2 min for Ambaji",
+      "severity": "high"
+    },
+    "phase": "critical"
+  },
+  {
+    "index": 126,
+    "timestamp_s": 630,
+    "timestamp_label": "10:30",
+    "corridor": "Ambaji",
+    "cpi": 0.747,
+    "flow_rate": 4499.6,
+    "transport_burst": 0.685,
+    "chokepoint_density": 0.692,
+    "slope": -0.00175,
+    "time_to_breach": null,
+    "prediction_fired": false,
+    "alert": {
+      "type": "predicted_breach",
+      "message": "WARNING: Breach predicted in None min for Ambaji",
+      "severity": "high"
+    },
+    "phase": "critical"
+  },
+  {
+    "index": 127,
+    "timestamp_s": 635,
+    "timestamp_label": "10:35",
+    "corridor": "Ambaji",
+    "cpi": 0.743,
+    "flow_rate": 4508.8,
+    "transport_burst": 0.689,
+    "chokepoint_density": 0.665,
+    "slope": -0.0013,
+    "time_to_breach": null,
+    "prediction_fired": false,
+    "alert": {
+      "type": "predicted_breach",
+      "message": "WARNING: Breach predicted in None min for Ambaji",
+      "severity": "high"
+    },
+    "phase": "critical"
+  },
+  {
+    "index": 128,
+    "timestamp_s": 640,
+    "timestamp_label": "10:39",
+    "corridor": "Ambaji",
+    "cpi": 0.752,
+    "flow_rate": 4511.9,
+    "transport_burst": 0.687,
+    "chokepoint_density": 0.676,
+    "slope": 0.00022,
+    "time_to_breach": null,
+    "prediction_fired": false,
+    "alert": {
+      "type": "predicted_breach",
+      "message": "WARNING: Breach predicted in None min for Ambaji",
+      "severity": "high"
+    },
+    "phase": "critical"
+  },
+  {
+    "index": 129,
+    "timestamp_s": 645,
+    "timestamp_label": "10:45",
+    "corridor": "Ambaji",
+    "cpi": 0.728,
+    "flow_rate": 4540.3,
+    "transport_burst": 0.651,
+    "chokepoint_density": 0.651,
+    "slope": 0.00633,
+    "time_to_breach": 14.5,
+    "prediction_fired": false,
+    "alert": {
+      "type": "predicted_breach",
+      "message": "WARNING: Breach predicted in 14.5 min for Ambaji",
+      "severity": "high"
+    },
+    "phase": "critical"
+  },
+  {
+    "index": 130,
+    "timestamp_s": 650,
+    "timestamp_label": "10:50",
+    "corridor": "Ambaji",
+    "cpi": 0.742,
+    "flow_rate": 4528.2,
+    "transport_burst": 0.711,
+    "chokepoint_density": 0.672,
+    "slope": 0.00333,
+    "time_to_breach": 14.3,
+    "prediction_fired": false,
+    "alert": {
+      "type": "predicted_breach",
+      "message": "WARNING: Breach predicted in 14.3 min for Ambaji",
+      "severity": "high"
+    },
+    "phase": "critical"
+  },
+  {
+    "index": 131,
+    "timestamp_s": 655,
+    "timestamp_label": "10:54",
+    "corridor": "Ambaji",
+    "cpi": 0.732,
+    "flow_rate": 4582.5,
+    "transport_burst": 0.693,
+    "chokepoint_density": 0.685,
+    "slope": 0.00647,
+    "time_to_breach": 14.2,
+    "prediction_fired": false,
+    "alert": {
+      "type": "predicted_breach",
+      "message": "WARNING: Breach predicted in 14.2 min for Ambaji",
+      "severity": "high"
+    },
+    "phase": "critical"
+  },
+  {
+    "index": 132,
+    "timestamp_s": 660,
+    "timestamp_label": "11:00",
+    "corridor": "Ambaji",
+    "cpi": 0.736,
+    "flow_rate": 4450.8,
+    "transport_burst": 0.692,
+    "chokepoint_density": 0.676,
+    "slope": 0.00572,
+    "time_to_breach": 14.0,
+    "prediction_fired": false,
+    "alert": {
+      "type": "predicted_breach",
+      "message": "WARNING: Breach predicted in 14.0 min for Ambaji",
+      "severity": "high"
+    },
+    "phase": "critical"
+  },
+  {
+    "index": 133,
+    "timestamp_s": 665,
+    "timestamp_label": "11:05",
+    "corridor": "Ambaji",
+    "cpi": 0.731,
+    "flow_rate": 4481.7,
+    "transport_burst": 0.659,
+    "chokepoint_density": 0.652,
+    "slope": 0.0069,
+    "time_to_breach": 13.8,
+    "prediction_fired": false,
+    "alert": {
+      "type": "predicted_breach",
+      "message": "WARNING: Breach predicted in 13.8 min for Ambaji",
+      "severity": "high"
+    },
+    "phase": "critical"
+  },
+  {
+    "index": 134,
+    "timestamp_s": 670,
+    "timestamp_label": "11:09",
+    "corridor": "Ambaji",
+    "cpi": 0.727,
+    "flow_rate": 4516.2,
+    "transport_burst": 0.695,
+    "chokepoint_density": 0.671,
+    "slope": 0.00553,
+    "time_to_breach": 13.7,
+    "prediction_fired": false,
+    "alert": {
+      "type": "predicted_breach",
+      "message": "WARNING: Breach predicted in 13.7 min for Ambaji",
+      "severity": "high"
+    },
+    "phase": "critical"
+  },
+  {
+    "index": 135,
+    "timestamp_s": 675,
+    "timestamp_label": "11:15",
+    "corridor": "Ambaji",
+    "cpi": 0.74,
+    "flow_rate": 4480.1,
+    "transport_burst": 0.622,
+    "chokepoint_density": 0.683,
+    "slope": 0.00852,
+    "time_to_breach": 13.5,
+    "prediction_fired": false,
+    "alert": {
+      "type": "predicted_breach",
+      "message": "WARNING: Breach predicted in 13.5 min for Ambaji",
+      "severity": "high"
+    },
+    "phase": "critical"
+  },
+  {
+    "index": 136,
+    "timestamp_s": 680,
+    "timestamp_label": "11:20",
+    "corridor": "Ambaji",
+    "cpi": 0.75,
+    "flow_rate": 4479.2,
+    "transport_burst": 0.694,
+    "chokepoint_density": 0.692,
+    "slope": 0.00771,
+    "time_to_breach": 13.3,
+    "prediction_fired": false,
+    "alert": {
+      "type": "predicted_breach",
+      "message": "WARNING: Breach predicted in 13.3 min for Ambaji",
+      "severity": "high"
+    },
+    "phase": "critical"
+  },
+  {
+    "index": 137,
+    "timestamp_s": 685,
+    "timestamp_label": "11:24",
+    "corridor": "Ambaji",
+    "cpi": 0.756,
+    "flow_rate": 4480.4,
+    "transport_burst": 0.683,
+    "chokepoint_density": 0.692,
+    "slope": 0.00823,
+    "time_to_breach": 13.2,
+    "prediction_fired": false,
+    "alert": {
+      "type": "predicted_breach",
+      "message": "WARNING: Breach predicted in 13.2 min for Ambaji",
+      "severity": "high"
+    },
+    "phase": "critical"
+  },
+  {
+    "index": 138,
+    "timestamp_s": 690,
+    "timestamp_label": "11:30",
+    "corridor": "Ambaji",
+    "cpi": 0.754,
+    "flow_rate": 4441.6,
+    "transport_burst": 0.671,
+    "chokepoint_density": 0.645,
+    "slope": 0.00468,
+    "time_to_breach": 13.0,
+    "prediction_fired": false,
+    "alert": {
+      "type": "predicted_breach",
+      "message": "WARNING: Breach predicted in 13.0 min for Ambaji",
+      "severity": "high"
+    },
+    "phase": "critical"
+  },
+  {
+    "index": 139,
+    "timestamp_s": 695,
+    "timestamp_label": "11:35",
+    "corridor": "Ambaji",
+    "cpi": 0.743,
+    "flow_rate": 4393.1,
+    "transport_burst": 0.636,
+    "chokepoint_density": 0.659,
+    "slope": 0.0098,
+    "time_to_breach": 12.8,
+    "prediction_fired": false,
+    "alert": {
+      "type": "predicted_breach",
+      "message": "WARNING: Breach predicted in 12.8 min for Ambaji",
+      "severity": "high"
+    },
+    "phase": "critical"
+  },
+  {
+    "index": 140,
+    "timestamp_s": 700,
+    "timestamp_label": "11:39",
+    "corridor": "Ambaji",
+    "cpi": 0.746,
+    "flow_rate": 4354.9,
+    "transport_burst": 0.692,
+    "chokepoint_density": 0.676,
+    "slope": 0.00906,
+    "time_to_breach": 12.7,
+    "prediction_fired": false,
+    "alert": {
+      "type": "predicted_breach",
+      "message": "WARNING: Breach predicted in 12.7 min for Ambaji",
+      "severity": "high"
+    },
+    "phase": "critical"
+  },
+  {
+    "index": 141,
+    "timestamp_s": 705,
+    "timestamp_label": "11:45",
+    "corridor": "Ambaji",
+    "cpi": 0.773,
+    "flow_rate": 4594.4,
+    "transport_burst": 0.674,
+    "chokepoint_density": 0.696,
+    "slope": 0.00112,
+    "time_to_breach": 12.5,
+    "prediction_fired": false,
+    "alert": {
+      "type": "predicted_breach",
+      "message": "WARNING: Breach predicted in 12.5 min for Ambaji",
+      "severity": "high"
+    },
+    "phase": "critical"
+  },
+  {
+    "index": 142,
+    "timestamp_s": 710,
+    "timestamp_label": "11:50",
+    "corridor": "Ambaji",
+    "cpi": 0.759,
+    "flow_rate": 4423.0,
+    "transport_burst": 0.724,
+    "chokepoint_density": 0.682,
+    "slope": 0.00278,
+    "time_to_breach": 12.3,
+    "prediction_fired": false,
+    "alert": {
+      "type": "predicted_breach",
+      "message": "WARNING: Breach predicted in 12.3 min for Ambaji",
+      "severity": "high"
+    },
+    "phase": "critical"
+  },
+  {
+    "index": 143,
+    "timestamp_s": 715,
+    "timestamp_label": "11:54",
+    "corridor": "Ambaji",
+    "cpi": 0.768,
+    "flow_rate": 4673.9,
+    "transport_burst": 0.71,
+    "chokepoint_density": 0.689,
+    "slope": 0.00475,
+    "time_to_breach": 12.2,
+    "prediction_fired": false,
+    "alert": {
+      "type": "predicted_breach",
+      "message": "WARNING: Breach predicted in 12.2 min for Ambaji",
+      "severity": "high"
+    },
+    "phase": "critical"
+  },
+  {
+    "index": 144,
+    "timestamp_s": 720,
+    "timestamp_label": "12:00",
+    "corridor": "Ambaji",
+    "cpi": 0.796,
+    "flow_rate": 4791.8,
+    "transport_burst": 0.74,
+    "chokepoint_density": 0.689,
+    "slope": 0.0085,
+    "time_to_breach": 12.0,
+    "prediction_fired": false,
+    "alert": {
+      "type": "predicted_breach",
+      "message": "WARNING: Breach predicted in 12.0 min for Ambaji",
+      "severity": "high"
+    },
+    "phase": "critical"
+  },
+  {
+    "index": 145,
+    "timestamp_s": 725,
+    "timestamp_label": "12:05",
+    "corridor": "Ambaji",
+    "cpi": 0.758,
+    "flow_rate": 4515.4,
+    "transport_burst": 0.678,
+    "chokepoint_density": 0.722,
+    "slope": 0.00856,
+    "time_to_breach": 11.8,
+    "prediction_fired": false,
+    "alert": {
+      "type": "predicted_breach",
+      "message": "WARNING: Breach predicted in 11.8 min for Ambaji",
+      "severity": "high"
+    },
+    "phase": "critical"
+  },
+  {
+    "index": 146,
+    "timestamp_s": 730,
+    "timestamp_label": "12:09",
+    "corridor": "Ambaji",
+    "cpi": 0.757,
+    "flow_rate": 4570.9,
+    "transport_burst": 0.709,
+    "chokepoint_density": 0.683,
+    "slope": 0.00291,
+    "time_to_breach": 11.7,
+    "prediction_fired": false,
+    "alert": {
+      "type": "predicted_breach",
+      "message": "WARNING: Breach predicted in 11.7 min for Ambaji",
+      "severity": "high"
+    },
+    "phase": "critical"
+  },
+  {
+    "index": 147,
+    "timestamp_s": 735,
+    "timestamp_label": "12:15",
+    "corridor": "Ambaji",
+    "cpi": 0.768,
+    "flow_rate": 4540.1,
+    "transport_burst": 0.703,
+    "chokepoint_density": 0.685,
+    "slope": 0.00792,
+    "time_to_breach": 11.5,
+    "prediction_fired": false,
+    "alert": {
+      "type": "predicted_breach",
+      "message": "WARNING: Breach predicted in 11.5 min for Ambaji",
+      "severity": "high"
+    },
+    "phase": "critical"
+  },
+  {
+    "index": 148,
+    "timestamp_s": 740,
+    "timestamp_label": "12:20",
+    "corridor": "Ambaji",
+    "cpi": 0.767,
+    "flow_rate": 4421.7,
+    "transport_burst": 0.684,
+    "chokepoint_density": 0.722,
+    "slope": 0.00359,
+    "time_to_breach": 11.3,
+    "prediction_fired": false,
+    "alert": {
+      "type": "predicted_breach",
+      "message": "WARNING: Breach predicted in 11.3 min for Ambaji",
+      "severity": "high"
+    },
+    "phase": "critical"
+  },
+  {
+    "index": 149,
+    "timestamp_s": 745,
+    "timestamp_label": "12:24",
+    "corridor": "Ambaji",
+    "cpi": 0.809,
+    "flow_rate": 4750.6,
+    "transport_burst": 0.703,
+    "chokepoint_density": 0.702,
+    "slope": -0.00631,
+    "time_to_breach": null,
+    "prediction_fired": false,
+    "alert": {
+      "type": "predicted_breach",
+      "message": "WARNING: Breach predicted in None min for Ambaji",
+      "severity": "high"
+    },
+    "phase": "critical"
+  },
+  {
+    "index": 150,
+    "timestamp_s": 750,
+    "timestamp_label": "12:30",
+    "corridor": "Ambaji",
+    "cpi": 0.768,
+    "flow_rate": 4795.7,
+    "transport_burst": 0.678,
+    "chokepoint_density": 0.709,
+    "slope": 0.01263,
+    "time_to_breach": 11.0,
+    "prediction_fired": false,
+    "alert": {
+      "type": "predicted_breach",
+      "message": "WARNING: Breach predicted in 11.0 min for Ambaji",
+      "severity": "high"
+    },
+    "phase": "critical"
+  },
+  {
+    "index": 151,
+    "timestamp_s": 755,
+    "timestamp_label": "12:35",
+    "corridor": "Ambaji",
+    "cpi": 0.783,
+    "flow_rate": 4538.5,
+    "transport_burst": 0.707,
+    "chokepoint_density": 0.712,
+    "slope": 0.00602,
+    "time_to_breach": 10.8,
+    "prediction_fired": false,
+    "alert": {
+      "type": "predicted_breach",
+      "message": "WARNING: Breach predicted in 10.8 min for Ambaji",
+      "severity": "high"
+    },
+    "phase": "critical"
+  },
+  {
+    "index": 152,
+    "timestamp_s": 760,
+    "timestamp_label": "12:39",
+    "corridor": "Ambaji",
+    "cpi": 0.787,
+    "flow_rate": 4514.8,
+    "transport_burst": 0.718,
+    "chokepoint_density": 0.693,
+    "slope": -0.00688,
+    "time_to_breach": null,
+    "prediction_fired": false,
+    "alert": {
+      "type": "predicted_breach",
+      "message": "WARNING: Breach predicted in None min for Ambaji",
+      "severity": "high"
+    },
+    "phase": "critical"
+  },
+  {
+    "index": 153,
+    "timestamp_s": 765,
+    "timestamp_label": "12:45",
+    "corridor": "Ambaji",
+    "cpi": 0.78,
+    "flow_rate": 4490.3,
+    "transport_burst": 0.727,
+    "chokepoint_density": 0.742,
+    "slope": 0.01231,
+    "time_to_breach": 10.5,
+    "prediction_fired": false,
+    "alert": {
+      "type": "predicted_breach",
+      "message": "WARNING: Breach predicted in 10.5 min for Ambaji",
+      "severity": "high"
+    },
+    "phase": "critical"
+  },
+  {
+    "index": 154,
+    "timestamp_s": 770,
+    "timestamp_label": "12:50",
+    "corridor": "Ambaji",
+    "cpi": 0.784,
+    "flow_rate": 4588.2,
+    "transport_burst": 0.732,
+    "chokepoint_density": 0.726,
+    "slope": 0.0027,
+    "time_to_breach": 10.3,
+    "prediction_fired": false,
+    "alert": {
+      "type": "predicted_breach",
+      "message": "WARNING: Breach predicted in 10.3 min for Ambaji",
+      "severity": "high"
+    },
+    "phase": "critical"
+  },
+  {
+    "index": 155,
+    "timestamp_s": 775,
+    "timestamp_label": "12:54",
+    "corridor": "Ambaji",
+    "cpi": 0.791,
+    "flow_rate": 4851.4,
+    "transport_burst": 0.717,
+    "chokepoint_density": 0.699,
+    "slope": 0.00313,
+    "time_to_breach": 10.2,
+    "prediction_fired": false,
+    "alert": {
+      "type": "predicted_breach",
+      "message": "WARNING: Breach predicted in 10.2 min for Ambaji",
+      "severity": "high"
+    },
+    "phase": "critical"
+  },
+  {
+    "index": 156,
+    "timestamp_s": 780,
+    "timestamp_label": "13:00",
+    "corridor": "Ambaji",
+    "cpi": 0.802,
+    "flow_rate": 4594.1,
+    "transport_burst": 0.721,
+    "chokepoint_density": 0.692,
+    "slope": -0.00135,
+    "time_to_breach": null,
+    "prediction_fired": false,
+    "alert": {
+      "type": "predicted_breach",
+      "message": "WARNING: Breach predicted in None min for Ambaji",
+      "severity": "high"
+    },
+    "phase": "critical"
+  },
+  {
+    "index": 157,
+    "timestamp_s": 785,
+    "timestamp_label": "13:05",
+    "corridor": "Ambaji",
+    "cpi": 0.82,
+    "flow_rate": 4807.5,
+    "transport_burst": 0.738,
+    "chokepoint_density": 0.707,
+    "slope": -0.00667,
+    "time_to_breach": null,
+    "prediction_fired": false,
+    "alert": {
+      "type": "predicted_breach",
+      "message": "WARNING: Breach predicted in None min for Ambaji",
+      "severity": "high"
+    },
+    "phase": "critical"
+  },
+  {
+    "index": 158,
+    "timestamp_s": 790,
+    "timestamp_label": "13:09",
+    "corridor": "Ambaji",
+    "cpi": 0.812,
+    "flow_rate": 4666.0,
+    "transport_burst": 0.771,
+    "chokepoint_density": 0.693,
+    "slope": -0.00328,
+    "time_to_breach": null,
+    "prediction_fired": false,
+    "alert": {
+      "type": "predicted_breach",
+      "message": "WARNING: Breach predicted in None min for Ambaji",
+      "severity": "high"
+    },
+    "phase": "critical"
+  },
+  {
+    "index": 159,
+    "timestamp_s": 795,
+    "timestamp_label": "13:15",
+    "corridor": "Ambaji",
+    "cpi": 0.822,
+    "flow_rate": 4568.0,
+    "transport_burst": 0.772,
+    "chokepoint_density": 0.69,
+    "slope": -0.00525,
+    "time_to_breach": null,
+    "prediction_fired": false,
+    "alert": {
+      "type": "predicted_breach",
+      "message": "WARNING: Breach predicted in None min for Ambaji",
+      "severity": "high"
+    },
+    "phase": "critical"
+  },
+  {
+    "index": 160,
+    "timestamp_s": 800,
+    "timestamp_label": "13:20",
+    "corridor": "Ambaji",
+    "cpi": 0.801,
+    "flow_rate": 4758.1,
+    "transport_burst": 0.648,
+    "chokepoint_density": 0.676,
+    "slope": 0.00051,
+    "time_to_breach": 9.3,
+    "prediction_fired": false,
+    "alert": {
+      "type": "predicted_breach",
+      "message": "WARNING: Breach predicted in 9.3 min for Ambaji",
+      "severity": "high"
+    },
+    "phase": "critical"
+  },
+  {
+    "index": 161,
+    "timestamp_s": 805,
+    "timestamp_label": "13:24",
+    "corridor": "Ambaji",
+    "cpi": 0.806,
+    "flow_rate": 4617.8,
+    "transport_burst": 0.725,
+    "chokepoint_density": 0.694,
+    "slope": 0.00033,
+    "time_to_breach": 9.2,
+    "prediction_fired": false,
+    "alert": {
+      "type": "predicted_breach",
+      "message": "WARNING: Breach predicted in 9.2 min for Ambaji",
+      "severity": "high"
+    },
+    "phase": "critical"
+  },
+  {
+    "index": 162,
+    "timestamp_s": 810,
+    "timestamp_label": "13:30",
+    "corridor": "Ambaji",
+    "cpi": 0.797,
+    "flow_rate": 4693.7,
+    "transport_burst": 0.739,
+    "chokepoint_density": 0.741,
+    "slope": 0.00284,
+    "time_to_breach": 9.0,
+    "prediction_fired": false,
+    "alert": {
+      "type": "predicted_breach",
+      "message": "WARNING: Breach predicted in 9.0 min for Ambaji",
+      "severity": "high"
+    },
+    "phase": "critical"
+  },
+  {
+    "index": 163,
+    "timestamp_s": 815,
+    "timestamp_label": "13:35",
+    "corridor": "Ambaji",
+    "cpi": 0.806,
+    "flow_rate": 4702.2,
+    "transport_burst": 0.723,
+    "chokepoint_density": 0.716,
+    "slope": -0.00289,
+    "time_to_breach": null,
+    "prediction_fired": false,
+    "alert": {
+      "type": "predicted_breach",
+      "message": "WARNING: Breach predicted in None min for Ambaji",
+      "severity": "high"
+    },
+    "phase": "critical"
+  },
+  {
+    "index": 164,
+    "timestamp_s": 820,
+    "timestamp_label": "13:39",
+    "corridor": "Ambaji",
+    "cpi": 0.816,
+    "flow_rate": 4647.6,
+    "transport_burst": 0.714,
+    "chokepoint_density": 0.692,
+    "slope": 0.00524,
+    "time_to_breach": 8.7,
+    "prediction_fired": false,
+    "alert": {
+      "type": "predicted_breach",
+      "message": "WARNING: Breach predicted in 8.7 min for Ambaji",
+      "severity": "high"
+    },
+    "phase": "critical"
+  },
+  {
+    "index": 165,
+    "timestamp_s": 825,
+    "timestamp_label": "13:45",
+    "corridor": "Ambaji",
+    "cpi": 0.812,
+    "flow_rate": 4820.8,
+    "transport_burst": 0.741,
+    "chokepoint_density": 0.687,
+    "slope": -0.00169,
+    "time_to_breach": null,
+    "prediction_fired": false,
+    "alert": {
+      "type": "predicted_breach",
+      "message": "WARNING: Breach predicted in None min for Ambaji",
+      "severity": "high"
+    },
+    "phase": "critical"
+  },
+  {
+    "index": 166,
+    "timestamp_s": 830,
+    "timestamp_label": "13:50",
+    "corridor": "Ambaji",
+    "cpi": 0.825,
+    "flow_rate": 4688.4,
+    "transport_burst": 0.717,
+    "chokepoint_density": 0.725,
+    "slope": -0.00166,
+    "time_to_breach": null,
+    "prediction_fired": false,
+    "alert": {
+      "type": "predicted_breach",
+      "message": "WARNING: Breach predicted in None min for Ambaji",
+      "severity": "high"
+    },
+    "phase": "critical"
+  },
+  {
+    "index": 167,
+    "timestamp_s": 835,
+    "timestamp_label": "13:54",
+    "corridor": "Ambaji",
+    "cpi": 0.806,
+    "flow_rate": 4668.5,
+    "transport_burst": 0.718,
+    "chokepoint_density": 0.666,
+    "slope": 0.00814,
+    "time_to_breach": 8.2,
+    "prediction_fired": false,
+    "alert": {
+      "type": "predicted_breach",
+      "message": "WARNING: Breach predicted in 8.2 min for Ambaji",
+      "severity": "high"
+    },
+    "phase": "critical"
+  },
+  {
+    "index": 168,
+    "timestamp_s": 840,
+    "timestamp_label": "14:00",
+    "corridor": "Ambaji",
+    "cpi": 0.81,
+    "flow_rate": 4829.2,
+    "transport_burst": 0.705,
+    "chokepoint_density": 0.688,
+    "slope": 0.01008,
+    "time_to_breach": 8.0,
+    "prediction_fired": false,
+    "alert": {
+      "type": "predicted_breach",
+      "message": "WARNING: Breach predicted in 8.0 min for Ambaji",
+      "severity": "high"
+    },
+    "phase": "critical"
+  },
+  {
+    "index": 169,
+    "timestamp_s": 845,
+    "timestamp_label": "14:05",
+    "corridor": "Ambaji",
+    "cpi": 0.803,
+    "flow_rate": 4632.2,
+    "transport_burst": 0.743,
+    "chokepoint_density": 0.709,
+    "slope": 0.0018,
+    "time_to_breach": 7.8,
+    "prediction_fired": false,
+    "alert": {
+      "type": "predicted_breach",
+      "message": "WARNING: Breach predicted in 7.8 min for Ambaji",
+      "severity": "high"
+    },
+    "phase": "critical"
+  },
+  {
+    "index": 170,
+    "timestamp_s": 850,
+    "timestamp_label": "14:09",
+    "corridor": "Ambaji",
+    "cpi": 0.826,
+    "flow_rate": 4744.4,
+    "transport_burst": 0.777,
+    "chokepoint_density": 0.741,
+    "slope": 0.01347,
+    "time_to_breach": 7.7,
+    "prediction_fired": false,
+    "alert": {
+      "type": "predicted_breach",
+      "message": "WARNING: Breach predicted in 7.7 min for Ambaji",
+      "severity": "high"
+    },
+    "phase": "critical"
+  },
+  {
+    "index": 171,
+    "timestamp_s": 855,
+    "timestamp_label": "14:15",
+    "corridor": "Ambaji",
+    "cpi": 0.806,
+    "flow_rate": 4698.2,
+    "transport_burst": 0.704,
+    "chokepoint_density": 0.741,
+    "slope": 0.01195,
+    "time_to_breach": 7.5,
+    "prediction_fired": false,
+    "alert": {
+      "type": "predicted_breach",
+      "message": "WARNING: Breach predicted in 7.5 min for Ambaji",
+      "severity": "high"
+    },
+    "phase": "critical"
+  },
+  {
+    "index": 172,
+    "timestamp_s": 860,
+    "timestamp_label": "14:20",
+    "corridor": "Ambaji",
+    "cpi": 0.837,
+    "flow_rate": 4725.9,
+    "transport_burst": 0.734,
+    "chokepoint_density": 0.695,
+    "slope": 0.00591,
+    "time_to_breach": 7.3,
+    "prediction_fired": false,
+    "alert": {
+      "type": "predicted_breach",
+      "message": "WARNING: Breach predicted in 7.3 min for Ambaji",
+      "severity": "high"
+    },
+    "phase": "critical"
+  },
+  {
+    "index": 173,
+    "timestamp_s": 865,
+    "timestamp_label": "14:24",
+    "corridor": "Ambaji",
+    "cpi": 0.837,
+    "flow_rate": 4769.7,
+    "transport_burst": 0.776,
+    "chokepoint_density": 0.75,
+    "slope": 0.00395,
+    "time_to_breach": 7.2,
+    "prediction_fired": false,
+    "alert": {
+      "type": "predicted_breach",
+      "message": "WARNING: Breach predicted in 7.2 min for Ambaji",
+      "severity": "high"
+    },
+    "phase": "critical"
+  },
+  {
+    "index": 174,
+    "timestamp_s": 870,
+    "timestamp_label": "14:30",
+    "corridor": "Ambaji",
+    "cpi": 0.813,
+    "flow_rate": 4656.1,
+    "transport_burst": 0.74,
+    "chokepoint_density": 0.729,
+    "slope": 0.01241,
+    "time_to_breach": 7.0,
+    "prediction_fired": false,
+    "alert": {
+      "type": "predicted_breach",
+      "message": "WARNING: Breach predicted in 7.0 min for Ambaji",
+      "severity": "high"
+    },
+    "phase": "critical"
+  },
+  {
+    "index": 175,
+    "timestamp_s": 875,
+    "timestamp_label": "14:35",
+    "corridor": "Ambaji",
+    "cpi": 0.822,
+    "flow_rate": 4761.1,
+    "transport_burst": 0.797,
+    "chokepoint_density": 0.741,
+    "slope": 0.0096,
+    "time_to_breach": 6.8,
+    "prediction_fired": false,
+    "alert": {
+      "type": "predicted_breach",
+      "message": "WARNING: Breach predicted in 6.8 min for Ambaji",
+      "severity": "high"
+    },
+    "phase": "critical"
+  },
+  {
+    "index": 176,
+    "timestamp_s": 880,
+    "timestamp_label": "14:39",
+    "corridor": "Ambaji",
+    "cpi": 0.836,
+    "flow_rate": 4862.0,
+    "transport_burst": 0.797,
+    "chokepoint_density": 0.737,
+    "slope": 0.00706,
+    "time_to_breach": 6.7,
+    "prediction_fired": false,
+    "alert": {
+      "type": "predicted_breach",
+      "message": "WARNING: Breach predicted in 6.7 min for Ambaji",
+      "severity": "high"
+    },
+    "phase": "critical"
+  },
+  {
+    "index": 177,
+    "timestamp_s": 885,
+    "timestamp_label": "14:45",
+    "corridor": "Ambaji",
+    "cpi": 0.828,
+    "flow_rate": 4820.7,
+    "transport_burst": 0.769,
+    "chokepoint_density": 0.715,
+    "slope": 0.00998,
+    "time_to_breach": 6.5,
+    "prediction_fired": false,
+    "alert": {
+      "type": "predicted_breach",
+      "message": "WARNING: Breach predicted in 6.5 min for Ambaji",
+      "severity": "high"
+    },
+    "phase": "critical"
+  },
+  {
+    "index": 178,
+    "timestamp_s": 890,
+    "timestamp_label": "14:50",
+    "corridor": "Ambaji",
+    "cpi": 0.833,
+    "flow_rate": 4709.0,
+    "transport_burst": 0.75,
+    "chokepoint_density": 0.772,
+    "slope": 0.00599,
+    "time_to_breach": 6.3,
+    "prediction_fired": false,
+    "alert": {
+      "type": "predicted_breach",
+      "message": "WARNING: Breach predicted in 6.3 min for Ambaji",
+      "severity": "high"
+    },
+    "phase": "critical"
+  },
+  {
+    "index": 179,
+    "timestamp_s": 895,
+    "timestamp_label": "14:54",
+    "corridor": "Ambaji",
+    "cpi": 0.854,
+    "flow_rate": 4782.0,
+    "transport_burst": 0.767,
+    "chokepoint_density": 0.722,
+    "slope": -0.004,
+    "time_to_breach": null,
+    "prediction_fired": false,
+    "alert": {
+      "type": "predicted_breach",
+      "message": "WARNING: Breach predicted in None min for Ambaji",
+      "severity": "high"
+    },
+    "phase": "critical"
+  },
+  {
+    "index": 180,
+    "timestamp_s": 900,
+    "timestamp_label": "15:00",
+    "corridor": "Ambaji",
+    "cpi": 0.855,
+    "flow_rate": 4847.1,
+    "transport_burst": 0.802,
+    "chokepoint_density": 0.742,
+    "slope": -0.00213,
+    "time_to_breach": null,
+    "prediction_fired": false,
+    "alert": {
+      "type": "predicted_breach",
+      "message": "WARNING: Breach predicted in None min for Ambaji",
+      "severity": "high"
+    },
+    "phase": "critical"
+  },
+  {
+    "index": 181,
+    "timestamp_s": 905,
+    "timestamp_label": "15:05",
+    "corridor": "Ambaji",
+    "cpi": 0.862,
+    "flow_rate": 4814.8,
+    "transport_burst": 0.733,
+    "chokepoint_density": 0.776,
+    "slope": -0.00145,
+    "time_to_breach": null,
+    "prediction_fired": false,
+    "alert": {
+      "type": "predicted_breach",
+      "message": "WARNING: Breach predicted in None min for Ambaji",
+      "severity": "high"
+    },
+    "phase": "critical"
+  },
+  {
+    "index": 182,
+    "timestamp_s": 910,
+    "timestamp_label": "15:09",
+    "corridor": "Ambaji",
+    "cpi": 0.823,
+    "flow_rate": 4755.4,
+    "transport_burst": 0.732,
+    "chokepoint_density": 0.762,
+    "slope": 0.00774,
+    "time_to_breach": 5.7,
+    "prediction_fired": false,
+    "alert": {
+      "type": "predicted_breach",
+      "message": "WARNING: Breach predicted in 5.7 min for Ambaji",
+      "severity": "high"
+    },
+    "phase": "critical"
+  },
+  {
+    "index": 183,
+    "timestamp_s": 915,
+    "timestamp_label": "15:15",
+    "corridor": "Ambaji",
+    "cpi": 0.844,
+    "flow_rate": 4734.6,
+    "transport_burst": 0.731,
+    "chokepoint_density": 0.726,
+    "slope": -0.00142,
+    "time_to_breach": null,
+    "prediction_fired": false,
+    "alert": {
+      "type": "predicted_breach",
+      "message": "WARNING: Breach predicted in None min for Ambaji",
+      "severity": "high"
+    },
+    "phase": "critical"
+  },
+  {
+    "index": 184,
+    "timestamp_s": 920,
+    "timestamp_label": "15:20",
+    "corridor": "Ambaji",
+    "cpi": 0.841,
+    "flow_rate": 4661.3,
+    "transport_burst": 0.718,
+    "chokepoint_density": 0.706,
+    "slope": 0.00404,
+    "time_to_breach": 5.3,
+    "prediction_fired": false,
+    "alert": {
+      "type": "predicted_breach",
+      "message": "WARNING: Breach predicted in 5.3 min for Ambaji",
+      "severity": "high"
+    },
+    "phase": "critical"
+  },
+  {
+    "index": 185,
+    "timestamp_s": 925,
+    "timestamp_label": "15:24",
+    "corridor": "Ambaji",
+    "cpi": 0.847,
+    "flow_rate": 4714.7,
+    "transport_burst": 0.772,
+    "chokepoint_density": 0.74,
+    "slope": 0.00301,
+    "time_to_breach": 5.2,
+    "prediction_fired": false,
+    "alert": {
+      "type": "predicted_breach",
+      "message": "WARNING: Breach predicted in 5.2 min for Ambaji",
+      "severity": "high"
+    },
+    "phase": "critical"
+  },
+  {
+    "index": 186,
+    "timestamp_s": 930,
+    "timestamp_label": "15:30",
+    "corridor": "Ambaji",
+    "cpi": 0.851,
+    "flow_rate": 4982.8,
+    "transport_burst": 0.769,
+    "chokepoint_density": 0.753,
+    "slope": -0.00649,
+    "time_to_breach": null,
+    "prediction_fired": false,
+    "alert": {
+      "type": "predicted_breach",
+      "message": "WARNING: Breach predicted in None min for Ambaji",
+      "severity": "high"
+    },
+    "phase": "critical"
+  },
+  {
+    "index": 187,
+    "timestamp_s": 935,
+    "timestamp_label": "15:35",
+    "corridor": "Ambaji",
+    "cpi": 0.851,
+    "flow_rate": 4643.2,
+    "transport_burst": 0.752,
+    "chokepoint_density": 0.751,
+    "slope": 0.00192,
+    "time_to_breach": 4.8,
+    "prediction_fired": false,
+    "alert": {
+      "type": "predicted_breach",
+      "message": "WARNING: Breach predicted in 4.8 min for Ambaji",
+      "severity": "high"
+    },
+    "phase": "critical"
+  },
+  {
+    "index": 188,
+    "timestamp_s": 940,
+    "timestamp_label": "15:39",
+    "corridor": "Ambaji",
+    "cpi": 0.867,
+    "flow_rate": 4796.3,
+    "transport_burst": 0.789,
+    "chokepoint_density": 0.722,
+    "slope": -0.00112,
+    "time_to_breach": null,
+    "prediction_fired": false,
+    "alert": {
+      "type": "predicted_breach",
+      "message": "WARNING: Breach predicted in None min for Ambaji",
+      "severity": "high"
+    },
+    "phase": "critical"
+  },
+  {
+    "index": 189,
+    "timestamp_s": 945,
+    "timestamp_label": "15:45",
+    "corridor": "Ambaji",
+    "cpi": 0.868,
+    "flow_rate": 4939.1,
+    "transport_burst": 0.772,
+    "chokepoint_density": 0.792,
+    "slope": -0.00134,
+    "time_to_breach": null,
+    "prediction_fired": false,
+    "alert": {
+      "type": "predicted_breach",
+      "message": "WARNING: Breach predicted in None min for Ambaji",
+      "severity": "high"
+    },
+    "phase": "critical"
+  },
+  {
+    "index": 190,
+    "timestamp_s": 950,
+    "timestamp_label": "15:50",
+    "corridor": "Ambaji",
+    "cpi": 0.86,
+    "flow_rate": 4616.4,
+    "transport_burst": 0.813,
+    "chokepoint_density": 0.741,
+    "slope": -0.0009,
+    "time_to_breach": null,
+    "prediction_fired": false,
+    "alert": {
+      "type": "predicted_breach",
+      "message": "WARNING: Breach predicted in None min for Ambaji",
+      "severity": "high"
+    },
+    "phase": "critical"
+  },
+  {
+    "index": 191,
+    "timestamp_s": 955,
+    "timestamp_label": "15:54",
+    "corridor": "Ambaji",
+    "cpi": 0.883,
+    "flow_rate": 5048.0,
+    "transport_burst": 0.788,
+    "chokepoint_density": 0.733,
+    "slope": -0.00161,
+    "time_to_breach": null,
+    "prediction_fired": false,
+    "alert": {
+      "type": "predicted_breach",
+      "message": "WARNING: Breach predicted in None min for Ambaji",
+      "severity": "high"
+    },
+    "phase": "critical"
+  },
+  {
+    "index": 192,
+    "timestamp_s": 960,
+    "timestamp_label": "16:00",
+    "corridor": "Ambaji",
+    "cpi": 0.862,
+    "flow_rate": 4765.4,
+    "transport_burst": 0.796,
+    "chokepoint_density": 0.707,
+    "slope": 0.00675,
+    "time_to_breach": 4.0,
+    "prediction_fired": false,
+    "alert": {
+      "type": "predicted_breach",
+      "message": "WARNING: Breach predicted in 4.0 min for Ambaji",
+      "severity": "high"
+    },
+    "phase": "critical"
+  },
+  {
+    "index": 193,
+    "timestamp_s": 965,
+    "timestamp_label": "16:04",
+    "corridor": "Ambaji",
+    "cpi": 0.877,
+    "flow_rate": 5101.8,
+    "transport_burst": 0.789,
+    "chokepoint_density": 0.717,
+    "slope": -0.00318,
+    "time_to_breach": null,
+    "prediction_fired": false,
+    "alert": {
+      "type": "predicted_breach",
+      "message": "WARNING: Breach predicted in None min for Ambaji",
+      "severity": "high"
+    },
+    "phase": "critical"
+  },
+  {
+    "index": 194,
+    "timestamp_s": 970,
+    "timestamp_label": "16:10",
+    "corridor": "Ambaji",
+    "cpi": 0.874,
+    "flow_rate": 4940.7,
+    "transport_burst": 0.804,
+    "chokepoint_density": 0.718,
+    "slope": 0.00042,
+    "time_to_breach": 3.7,
+    "prediction_fired": false,
+    "alert": {
+      "type": "predicted_breach",
+      "message": "WARNING: Breach predicted in 3.7 min for Ambaji",
+      "severity": "high"
+    },
+    "phase": "critical"
+  },
+  {
+    "index": 195,
+    "timestamp_s": 975,
+    "timestamp_label": "16:15",
+    "corridor": "Ambaji",
+    "cpi": 0.887,
+    "flow_rate": 5087.5,
+    "transport_burst": 0.835,
+    "chokepoint_density": 0.756,
+    "slope": 0.00251,
+    "time_to_breach": 3.5,
+    "prediction_fired": false,
+    "alert": {
+      "type": "predicted_breach",
+      "message": "WARNING: Breach predicted in 3.5 min for Ambaji",
+      "severity": "high"
+    },
+    "phase": "critical"
+  },
+  {
+    "index": 196,
+    "timestamp_s": 980,
+    "timestamp_label": "16:19",
+    "corridor": "Ambaji",
+    "cpi": 0.898,
+    "flow_rate": 5090.2,
+    "transport_burst": 0.814,
+    "chokepoint_density": 0.787,
+    "slope": -0.00801,
+    "time_to_breach": null,
+    "prediction_fired": false,
+    "alert": {
+      "type": "predicted_breach",
+      "message": "WARNING: Breach predicted in None min for Ambaji",
+      "severity": "high"
+    },
+    "phase": "critical"
+  },
+  {
+    "index": 197,
+    "timestamp_s": 985,
+    "timestamp_label": "16:25",
+    "corridor": "Ambaji",
+    "cpi": 0.862,
+    "flow_rate": 4959.5,
+    "transport_burst": 0.762,
+    "chokepoint_density": 0.749,
+    "slope": 0.00547,
+    "time_to_breach": 3.2,
+    "prediction_fired": false,
+    "alert": {
+      "type": "predicted_breach",
+      "message": "WARNING: Breach predicted in 3.2 min for Ambaji",
+      "severity": "high"
+    },
+    "phase": "critical"
+  },
+  {
+    "index": 198,
+    "timestamp_s": 990,
+    "timestamp_label": "16:30",
+    "corridor": "Ambaji",
+    "cpi": 0.876,
+    "flow_rate": 4937.4,
+    "transport_burst": 0.755,
+    "chokepoint_density": 0.76,
+    "slope": 0.00456,
+    "time_to_breach": 3.0,
+    "prediction_fired": false,
+    "alert": {
+      "type": "predicted_breach",
+      "message": "WARNING: Breach predicted in 3.0 min for Ambaji",
+      "severity": "high"
+    },
+    "phase": "critical"
+  },
+  {
+    "index": 199,
+    "timestamp_s": 995,
+    "timestamp_label": "16:34",
+    "corridor": "Ambaji",
+    "cpi": 0.882,
+    "flow_rate": 4867.5,
+    "transport_burst": 0.805,
+    "chokepoint_density": 0.799,
+    "slope": -0.0001,
+    "time_to_breach": null,
+    "prediction_fired": false,
+    "alert": {
+      "type": "predicted_breach",
+      "message": "WARNING: Breach predicted in None min for Ambaji",
+      "severity": "high"
+    },
+    "phase": "critical"
+  },
+  {
+    "index": 200,
+    "timestamp_s": 1000,
+    "timestamp_label": "16:40",
+    "corridor": "Ambaji",
+    "cpi": 0.9,
+    "flow_rate": 5069.5,
+    "transport_burst": 0.732,
+    "chokepoint_density": 0.757,
+    "slope": -0.00548,
+    "time_to_breach": null,
+    "prediction_fired": false,
+    "alert": {
+      "type": "predicted_breach",
+      "message": "WARNING: Breach predicted in None min for Ambaji",
+      "severity": "high"
+    },
+    "phase": "critical"
+  },
+  {
+    "index": 201,
+    "timestamp_s": 1005,
+    "timestamp_label": "16:45",
+    "corridor": "Ambaji",
+    "cpi": 0.896,
+    "flow_rate": 4995.7,
+    "transport_burst": 0.807,
+    "chokepoint_density": 0.783,
+    "slope": -0.00472,
+    "time_to_breach": null,
+    "prediction_fired": false,
+    "alert": {
+      "type": "predicted_breach",
+      "message": "WARNING: Breach predicted in None min for Ambaji",
+      "severity": "high"
+    },
+    "phase": "critical"
+  },
+  {
+    "index": 202,
+    "timestamp_s": 1010,
+    "timestamp_label": "16:49",
+    "corridor": "Ambaji",
+    "cpi": 0.88,
+    "flow_rate": 4818.1,
+    "transport_burst": 0.779,
+    "chokepoint_density": 0.758,
+    "slope": 0.00567,
+    "time_to_breach": 2.3,
+    "prediction_fired": false,
+    "alert": {
+      "type": "predicted_breach",
+      "message": "WARNING: Breach predicted in 2.3 min for Ambaji",
+      "severity": "high"
+    },
+    "phase": "critical"
+  },
+  {
+    "index": 203,
+    "timestamp_s": 1015,
+    "timestamp_label": "16:55",
+    "corridor": "Ambaji",
+    "cpi": 0.882,
+    "flow_rate": 5016.6,
+    "transport_burst": 0.808,
+    "chokepoint_density": 0.793,
+    "slope": 0.00775,
+    "time_to_breach": 2.2,
+    "prediction_fired": false,
+    "alert": {
+      "type": "predicted_breach",
+      "message": "WARNING: Breach predicted in 2.2 min for Ambaji",
+      "severity": "high"
+    },
+    "phase": "critical"
+  },
+  {
+    "index": 204,
+    "timestamp_s": 1020,
+    "timestamp_label": "17:00",
+    "corridor": "Ambaji",
+    "cpi": 0.895,
+    "flow_rate": 5035.7,
+    "transport_burst": 0.81,
+    "chokepoint_density": 0.756,
+    "slope": 0.00642,
+    "time_to_breach": 2.0,
+    "prediction_fired": false,
+    "alert": {
+      "type": "predicted_breach",
+      "message": "WARNING: Breach predicted in 2.0 min for Ambaji",
+      "severity": "high"
+    },
+    "phase": "critical"
+  },
+  {
+    "index": 205,
+    "timestamp_s": 1025,
+    "timestamp_label": "17:04",
+    "corridor": "Ambaji",
+    "cpi": 0.916,
+    "flow_rate": 5216.4,
+    "transport_burst": 0.81,
+    "chokepoint_density": 0.788,
+    "slope": -0.00321,
+    "time_to_breach": null,
+    "prediction_fired": false,
+    "alert": {
+      "type": "predicted_breach",
+      "message": "WARNING: Breach predicted in None min for Ambaji",
+      "severity": "high"
+    },
+    "phase": "critical"
+  },
+  {
+    "index": 206,
+    "timestamp_s": 1030,
+    "timestamp_label": "17:10",
+    "corridor": "Ambaji",
+    "cpi": 0.897,
+    "flow_rate": 5036.3,
+    "transport_burst": 0.793,
+    "chokepoint_density": 0.766,
+    "slope": 0.00905,
+    "time_to_breach": 1.7,
+    "prediction_fired": false,
+    "alert": {
+      "type": "predicted_breach",
+      "message": "WARNING: Breach predicted in 1.7 min for Ambaji",
+      "severity": "high"
+    },
+    "phase": "critical"
+  },
+  {
+    "index": 207,
+    "timestamp_s": 1035,
+    "timestamp_label": "17:15",
+    "corridor": "Ambaji",
+    "cpi": 0.901,
+    "flow_rate": 4999.1,
+    "transport_burst": 0.821,
+    "chokepoint_density": 0.776,
+    "slope": 0.00251,
+    "time_to_breach": 1.5,
+    "prediction_fired": false,
+    "alert": {
+      "type": "predicted_breach",
+      "message": "WARNING: Breach predicted in 1.5 min for Ambaji",
+      "severity": "high"
+    },
+    "phase": "critical"
+  },
+  {
+    "index": 208,
+    "timestamp_s": 1040,
+    "timestamp_label": "17:19",
+    "corridor": "Ambaji",
+    "cpi": 0.9,
+    "flow_rate": 4880.9,
+    "transport_burst": 0.797,
+    "chokepoint_density": 0.749,
+    "slope": 0.00309,
+    "time_to_breach": 1.3,
+    "prediction_fired": false,
+    "alert": {
+      "type": "predicted_breach",
+      "message": "WARNING: Breach predicted in 1.3 min for Ambaji",
+      "severity": "high"
+    },
+    "phase": "critical"
+  },
+  {
+    "index": 209,
+    "timestamp_s": 1045,
+    "timestamp_label": "17:25",
+    "corridor": "Ambaji",
+    "cpi": 0.889,
+    "flow_rate": 5037.9,
+    "transport_burst": 0.809,
+    "chokepoint_density": 0.771,
+    "slope": 0.00633,
+    "time_to_breach": 1.2,
+    "prediction_fired": false,
+    "alert": {
+      "type": "predicted_breach",
+      "message": "WARNING: Breach predicted in 1.2 min for Ambaji",
+      "severity": "high"
+    },
+    "phase": "critical"
+  },
+  {
+    "index": 210,
+    "timestamp_s": 1050,
+    "timestamp_label": "17:30",
+    "corridor": "Ambaji",
+    "cpi": 0.91,
+    "flow_rate": 4844.1,
+    "transport_burst": 0.778,
+    "chokepoint_density": 0.775,
+    "slope": 0.00172,
+    "time_to_breach": 1.0,
+    "prediction_fired": false,
+    "alert": {
+      "type": "predicted_breach",
+      "message": "WARNING: Breach predicted in 1.0 min for Ambaji",
+      "severity": "high"
+    },
+    "phase": "critical"
+  },
+  {
+    "index": 211,
+    "timestamp_s": 1055,
+    "timestamp_label": "17:34",
+    "corridor": "Ambaji",
+    "cpi": 0.906,
+    "flow_rate": 4918.3,
+    "transport_burst": 0.806,
+    "chokepoint_density": 0.766,
+    "slope": -0.00196,
+    "time_to_breach": null,
+    "prediction_fired": false,
+    "alert": {
+      "type": "predicted_breach",
+      "message": "WARNING: Breach predicted in None min for Ambaji",
+      "severity": "high"
+    },
+    "phase": "critical"
+  },
+  {
+    "index": 212,
+    "timestamp_s": 1060,
+    "timestamp_label": "17:40",
+    "corridor": "Ambaji",
+    "cpi": 0.913,
+    "flow_rate": 5011.3,
+    "transport_burst": 0.837,
+    "chokepoint_density": 0.793,
+    "slope": 0.00362,
+    "time_to_breach": 0.7,
+    "prediction_fired": false,
+    "alert": {
+      "type": "predicted_breach",
+      "message": "WARNING: Breach predicted in 0.7 min for Ambaji",
+      "severity": "high"
+    },
+    "phase": "critical"
+  },
+  {
+    "index": 213,
+    "timestamp_s": 1065,
+    "timestamp_label": "17:45",
+    "corridor": "Ambaji",
+    "cpi": 0.915,
+    "flow_rate": 4960.0,
+    "transport_burst": 0.785,
+    "chokepoint_density": 0.751,
+    "slope": 0.01223,
+    "time_to_breach": 0.5,
+    "prediction_fired": false,
+    "alert": {
+      "type": "predicted_breach",
+      "message": "WARNING: Breach predicted in 0.5 min for Ambaji",
+      "severity": "high"
+    },
+    "phase": "critical"
+  },
+  {
+    "index": 214,
+    "timestamp_s": 1070,
+    "timestamp_label": "17:49",
+    "corridor": "Ambaji",
+    "cpi": 0.9,
+    "flow_rate": 4971.3,
+    "transport_burst": 0.789,
+    "chokepoint_density": 0.766,
+    "slope": 0.00348,
+    "time_to_breach": 0.3,
+    "prediction_fired": false,
+    "alert": {
+      "type": "predicted_breach",
+      "message": "WARNING: Breach predicted in 0.3 min for Ambaji",
+      "severity": "high"
+    },
+    "phase": "critical"
+  },
+  {
+    "index": 215,
+    "timestamp_s": 1075,
+    "timestamp_label": "17:55",
+    "corridor": "Ambaji",
+    "cpi": 0.893,
+    "flow_rate": 4877.2,
+    "transport_burst": 0.758,
+    "chokepoint_density": 0.765,
+    "slope": 0.00574,
+    "time_to_breach": 0.2,
+    "prediction_fired": false,
+    "alert": {
+      "type": "predicted_breach",
+      "message": "WARNING: Breach predicted in 0.2 min for Ambaji",
+      "severity": "high"
+    },
+    "phase": "critical"
+  },
+  {
+    "index": 216,
+    "timestamp_s": 1080,
+    "timestamp_label": "18:00",
+    "corridor": "Ambaji",
+    "cpi": 0.909,
+    "flow_rate": 5036.6,
+    "transport_burst": 0.79,
+    "chokepoint_density": 0.796,
+    "slope": 0.0017,
+    "time_to_breach": null,
+    "prediction_fired": false,
+    "alert": {
+      "type": "genuine_crush",
+      "message": "CRITICAL: Genuine crush developing in Ambaji",
+      "severity": "critical"
+    },
+    "phase": "critical"
+  },
+  {
+    "index": 217,
+    "timestamp_s": 1085,
+    "timestamp_label": "18:04",
+    "corridor": "Ambaji",
+    "cpi": 0.92,
+    "flow_rate": 4933.3,
+    "transport_burst": 0.829,
+    "chokepoint_density": 0.776,
+    "slope": 0.00123,
+    "time_to_breach": null,
+    "prediction_fired": false,
+    "alert": {
+      "type": "genuine_crush",
+      "message": "CRITICAL: Genuine crush developing in Ambaji",
+      "severity": "critical"
+    },
+    "phase": "critical"
+  },
+  {
+    "index": 218,
+    "timestamp_s": 1090,
+    "timestamp_label": "18:10",
+    "corridor": "Ambaji",
+    "cpi": 0.922,
+    "flow_rate": 5042.5,
+    "transport_burst": 0.819,
+    "chokepoint_density": 0.777,
+    "slope": 0.00456,
+    "time_to_breach": null,
+    "prediction_fired": false,
+    "alert": {
+      "type": "genuine_crush",
+      "message": "CRITICAL: Genuine crush developing in Ambaji",
+      "severity": "critical"
+    },
+    "phase": "critical"
+  },
+  {
+    "index": 219,
+    "timestamp_s": 1095,
+    "timestamp_label": "18:15",
+    "corridor": "Ambaji",
+    "cpi": 0.93,
+    "flow_rate": 5125.5,
+    "transport_burst": 0.79,
+    "chokepoint_density": 0.767,
+    "slope": -0.00589,
+    "time_to_breach": null,
+    "prediction_fired": false,
+    "alert": {
+      "type": "genuine_crush",
+      "message": "CRITICAL: Genuine crush developing in Ambaji",
+      "severity": "critical"
+    },
+    "phase": "critical"
+  },
+  {
+    "index": 220,
+    "timestamp_s": 1100,
+    "timestamp_label": "18:19",
+    "corridor": "Ambaji",
+    "cpi": 0.916,
+    "flow_rate": 5080.1,
+    "transport_burst": 0.787,
+    "chokepoint_density": 0.805,
+    "slope": -0.00941,
+    "time_to_breach": null,
+    "prediction_fired": false,
+    "alert": {
+      "type": "genuine_crush",
+      "message": "CRITICAL: Genuine crush developing in Ambaji",
+      "severity": "critical"
+    },
+    "phase": "critical"
+  },
+  {
+    "index": 221,
+    "timestamp_s": 1105,
+    "timestamp_label": "18:25",
+    "corridor": "Ambaji",
+    "cpi": 0.895,
+    "flow_rate": 4932.8,
+    "transport_burst": 0.73,
+    "chokepoint_density": 0.754,
+    "slope": -0.01546,
+    "time_to_breach": null,
+    "prediction_fired": false,
+    "alert": {
+      "type": "genuine_crush",
+      "message": "CRITICAL: Genuine crush developing in Ambaji",
+      "severity": "critical"
+    },
+    "phase": "critical"
+  },
+  {
+    "index": 222,
+    "timestamp_s": 1110,
+    "timestamp_label": "18:30",
+    "corridor": "Ambaji",
+    "cpi": 0.913,
+    "flow_rate": 5000.0,
+    "transport_burst": 0.797,
+    "chokepoint_density": 0.767,
+    "slope": -0.02377,
+    "time_to_breach": null,
+    "prediction_fired": false,
+    "alert": {
+      "type": "genuine_crush",
+      "message": "CRITICAL: Genuine crush developing in Ambaji",
+      "severity": "critical"
+    },
+    "phase": "critical"
+  },
+  {
+    "index": 223,
+    "timestamp_s": 1115,
+    "timestamp_label": "18:34",
+    "corridor": "Ambaji",
+    "cpi": 0.902,
+    "flow_rate": 4894.5,
+    "transport_burst": 0.831,
+    "chokepoint_density": 0.741,
+    "slope": -0.04034,
+    "time_to_breach": null,
+    "prediction_fired": false,
+    "alert": {
+      "type": "genuine_crush",
+      "message": "CRITICAL: Genuine crush developing in Ambaji",
+      "severity": "critical"
+    },
+    "phase": "critical"
+  },
+  {
+    "index": 224,
+    "timestamp_s": 1120,
+    "timestamp_label": "18:40",
+    "corridor": "Ambaji",
+    "cpi": 0.874,
+    "flow_rate": 4707.4,
+    "transport_burst": 0.794,
+    "chokepoint_density": 0.732,
+    "slope": -0.0389,
+    "time_to_breach": null,
+    "prediction_fired": false,
+    "alert": {
+      "type": "genuine_crush",
+      "message": "CRITICAL: Genuine crush developing in Ambaji",
+      "severity": "critical"
+    },
+    "phase": "critical"
+  },
+  {
+    "index": 225,
+    "timestamp_s": 1125,
+    "timestamp_label": "18:45",
+    "corridor": "Ambaji",
+    "cpi": 0.821,
+    "flow_rate": 4898.4,
+    "transport_burst": 0.721,
+    "chokepoint_density": 0.725,
+    "slope": -0.02899,
+    "time_to_breach": null,
+    "prediction_fired": false,
+    "alert": {
+      "type": "genuine_crush",
+      "message": "CRITICAL: Genuine crush developing in Ambaji",
+      "severity": "critical"
+    },
+    "phase": "critical"
+  },
+  {
+    "index": 226,
+    "timestamp_s": 1130,
+    "timestamp_label": "18:49",
+    "corridor": "Ambaji",
+    "cpi": 0.788,
+    "flow_rate": 4569.1,
+    "transport_burst": 0.716,
+    "chokepoint_density": 0.709,
+    "slope": -0.02768,
+    "time_to_breach": null,
+    "prediction_fired": false,
+    "alert": {
+      "type": "genuine_crush",
+      "message": "CRITICAL: Genuine crush developing in Ambaji",
+      "severity": "critical"
+    },
+    "phase": "critical"
+  },
+  {
+    "index": 227,
+    "timestamp_s": 1135,
+    "timestamp_label": "18:55",
+    "corridor": "Ambaji",
+    "cpi": 0.748,
+    "flow_rate": 4477.1,
+    "transport_burst": 0.696,
+    "chokepoint_density": 0.68,
+    "slope": -0.02919,
+    "time_to_breach": null,
+    "prediction_fired": false,
+    "alert": {
+      "type": "genuine_crush",
+      "message": "CRITICAL: Genuine crush developing in Ambaji",
+      "severity": "critical"
+    },
+    "phase": "critical"
+  },
+  {
+    "index": 228,
+    "timestamp_s": 1140,
+    "timestamp_label": "19:00",
+    "corridor": "Ambaji",
+    "cpi": 0.726,
+    "flow_rate": 4389.4,
+    "transport_burst": 0.653,
+    "chokepoint_density": 0.68,
+    "slope": -0.03653,
+    "time_to_breach": null,
+    "prediction_fired": false,
+    "alert": {
+      "type": "none",
+      "message": "Pressure resolving",
+      "severity": "none"
+    },
+    "phase": "surge_resolving"
+  },
+  {
+    "index": 229,
+    "timestamp_s": 1145,
+    "timestamp_label": "19:04",
+    "corridor": "Ambaji",
+    "cpi": 0.708,
+    "flow_rate": 4415.7,
+    "transport_burst": 0.628,
+    "chokepoint_density": 0.667,
+    "slope": -0.03621,
+    "time_to_breach": null,
+    "prediction_fired": false,
+    "alert": {
+      "type": "none",
+      "message": "Pressure resolving",
+      "severity": "none"
+    },
+    "phase": "surge_resolving"
+  },
+  {
+    "index": 230,
+    "timestamp_s": 1150,
+    "timestamp_label": "19:10",
+    "corridor": "Ambaji",
+    "cpi": 0.671,
+    "flow_rate": 4385.5,
+    "transport_burst": 0.624,
+    "chokepoint_density": 0.625,
+    "slope": -0.03769,
+    "time_to_breach": null,
+    "prediction_fired": false,
+    "alert": {
+      "type": "none",
+      "message": "Pressure resolving",
+      "severity": "none"
+    },
+    "phase": "surge_resolving"
+  },
+  {
+    "index": 231,
+    "timestamp_s": 1155,
+    "timestamp_label": "19:15",
+    "corridor": "Ambaji",
+    "cpi": 0.618,
+    "flow_rate": 4049.3,
+    "transport_burst": 0.602,
+    "chokepoint_density": 0.609,
+    "slope": -0.03026,
+    "time_to_breach": null,
+    "prediction_fired": false,
+    "alert": {
+      "type": "none",
+      "message": "Pressure resolving",
+      "severity": "none"
+    },
+    "phase": "surge_resolving"
+  },
+  {
+    "index": 232,
+    "timestamp_s": 1160,
+    "timestamp_label": "19:19",
+    "corridor": "Ambaji",
+    "cpi": 0.589,
+    "flow_rate": 4057.0,
+    "transport_burst": 0.561,
+    "chokepoint_density": 0.571,
+    "slope": -0.02988,
+    "time_to_breach": null,
+    "prediction_fired": false,
+    "alert": {
+      "type": "none",
+      "message": "Pressure resolving",
+      "severity": "none"
+    },
+    "phase": "surge_resolving"
+  },
+  {
+    "index": 233,
+    "timestamp_s": 1165,
+    "timestamp_label": "19:25",
+    "corridor": "Ambaji",
+    "cpi": 0.562,
+    "flow_rate": 3847.1,
+    "transport_burst": 0.576,
+    "chokepoint_density": 0.593,
+    "slope": -0.031,
+    "time_to_breach": null,
+    "prediction_fired": false,
+    "alert": {
+      "type": "none",
+      "message": "Pressure resolving",
+      "severity": "none"
+    },
+    "phase": "surge_resolving"
+  },
+  {
+    "index": 234,
+    "timestamp_s": 1170,
+    "timestamp_label": "19:30",
+    "corridor": "Ambaji",
+    "cpi": 0.535,
+    "flow_rate": 3905.7,
+    "transport_burst": 0.534,
+    "chokepoint_density": 0.578,
+    "slope": -0.02612,
+    "time_to_breach": null,
+    "prediction_fired": false,
+    "alert": {
+      "type": "none",
+      "message": "Pressure resolving",
+      "severity": "none"
+    },
+    "phase": "surge_resolving"
+  },
+  {
+    "index": 235,
+    "timestamp_s": 1175,
+    "timestamp_label": "19:34",
+    "corridor": "Ambaji",
+    "cpi": 0.502,
+    "flow_rate": 3796.1,
+    "transport_burst": 0.533,
+    "chokepoint_density": 0.534,
+    "slope": -0.03706,
+    "time_to_breach": null,
+    "prediction_fired": false,
+    "alert": {
+      "type": "none",
+      "message": "Pressure resolving",
+      "severity": "none"
+    },
+    "phase": "surge_resolving"
+  },
+  {
+    "index": 236,
+    "timestamp_s": 1180,
+    "timestamp_label": "19:40",
+    "corridor": "Ambaji",
+    "cpi": 0.48,
+    "flow_rate": 3546.1,
+    "transport_burst": 0.54,
+    "chokepoint_density": 0.546,
+    "slope": -0.0351,
+    "time_to_breach": null,
+    "prediction_fired": false,
+    "alert": {
+      "type": "none",
+      "message": "Pressure resolving",
+      "severity": "none"
+    },
+    "phase": "surge_resolving"
+  },
+  {
+    "index": 237,
+    "timestamp_s": 1185,
+    "timestamp_label": "19:45",
+    "corridor": "Ambaji",
+    "cpi": 0.437,
+    "flow_rate": 3713.2,
+    "transport_burst": 0.441,
+    "chokepoint_density": 0.48,
+    "slope": -0.02408,
+    "time_to_breach": null,
+    "prediction_fired": false,
+    "alert": {
+      "type": "none",
+      "message": "Pressure resolving",
+      "severity": "none"
+    },
+    "phase": "surge_resolving"
+  },
+  {
+    "index": 238,
+    "timestamp_s": 1190,
+    "timestamp_label": "19:49",
+    "corridor": "Ambaji",
+    "cpi": 0.401,
+    "flow_rate": 3353.5,
+    "transport_burst": 0.443,
+    "chokepoint_density": 0.485,
+    "slope": -0.01295,
+    "time_to_breach": null,
+    "prediction_fired": false,
+    "alert": {
+      "type": "none",
+      "message": "Pressure resolving",
+      "severity": "none"
+    },
+    "phase": "surge_resolving"
+  },
+  {
+    "index": 239,
+    "timestamp_s": 1195,
+    "timestamp_label": "19:55",
+    "corridor": "Ambaji",
+    "cpi": 0.391,
+    "flow_rate": 3288.2,
+    "transport_burst": 0.4,
+    "chokepoint_density": 0.485,
+    "slope": -0.00724,
+    "time_to_breach": null,
+    "prediction_fired": false,
+    "alert": {
+      "type": "none",
+      "message": "Pressure resolving",
+      "severity": "none"
+    },
+    "phase": "surge_resolving"
+  }
+]

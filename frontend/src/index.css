@@ -1,0 +1,11 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+* { box-sizing: border-box; }
+body { margin: 0; font-family: 'Inter', system-ui, -apple-system, sans-serif; }
+
+/* Leaflet z-index fix inside sticky header */
+.leaflet-pane,
+.leaflet-top,
+.leaflet-bottom { z-index: 10 !important; }

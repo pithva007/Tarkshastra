@@ -1,0 +1,21 @@
+services:
+  - type: web
+    name: ts11-backend
+    runtime: python
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: FRONTEND_URL
+        value: https://ts11-frontend.onrender.com
+
+  - type: static
+    name: ts11-frontend
+    rootDir: frontend
+    buildCommand: npm install && npm run build
+    staticPublishPath: dist
+    envVars:
+      - key: VITE_WS_URL
+        value: wss://ts11-backend.onrender.com/ws
+      - key: VITE_API_URL
+        value: https://ts11-backend.onrender.com
