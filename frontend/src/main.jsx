@@ -5,16 +5,20 @@ import Login from './pages/Login.jsx'
 import './index.css'
 
 function Router() {
-  const path = window.location.pathname
   const token = localStorage.getItem('ts11_token')
   const role = localStorage.getItem('ts11_role')
 
-  // /login path OR no auth → show Login
-  if (path === '/login' || !token || !role) {
+  console.log('[ROUTER] Token:', token ? 'exists' : 'missing')
+  console.log('[ROUTER] Role:', role)
+
+  // No auth → show Login
+  if (!token || !role) {
+    console.log('[ROUTER] No auth, showing Login')
     return <Login />
   }
 
-  // / path with valid auth → show App
+  // Has auth → show App
+  console.log('[ROUTER] Has auth, showing App')
   return <App />
 }
 

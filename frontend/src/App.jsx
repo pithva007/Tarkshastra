@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { api } from './utils/auth'
 
 import { useWebSocket } from './hooks/useWebSocket'
@@ -17,7 +17,6 @@ import HistoricalPanel from './components/HistoricalPanel'
 import AlertReplyModal from './components/AlertReplyModal'
 import AdminPanel from './components/AdminPanel'
 import PDFViewer from './components/PDFViewer'
-import Login from './pages/Login'
 
 const ROLE_COLORS = {
   police: '#3B82F6',
@@ -34,7 +33,7 @@ const ROLE_TABS = {
 }
 
 export default function App() {
-  // ── Auth check ─────────────────────────────
+  // ── Get auth data ─────────────────────────────
   const token = localStorage.getItem('ts11_token')
   const role = localStorage.getItem('ts11_role')
   const userRaw = localStorage.getItem('ts11_user')
@@ -48,50 +47,62 @@ export default function App() {
 
   // Read agency from URL
   const params = new URLSearchParams(window.location.search)
-  const agencyParam = params.get('agency')
-
-  // If no token → show Login page
-  if (!token || !role) {
-    return <Login />
-  }
-
-  // If agency param doesn't match stored role (and not admin)
-  // redirect to correct agency URL
-  if (agencyParam && agencyParam !== role && role !== 'admin') {
-    window.location.href = `/?agency=${role}`
-    return null
-  }
 
   // Use role from localStorage (more reliable than URL param)
-  const activeRole = role
-  const activeAgency = agencyParam || role
+  const activeRole = role || 'police'
+
+  // Track alert IDs that have been dismissed or replied
+  // Using ref so it persists without causing re-renders
+  const dismissedAlerts = useRef(new Set())
+  const repliedAlerts = useRef(new Set())
+
+  // Current active modal state
+  const [activeAlert, setActiveAlert] = useState(null)
+  const [showAlertModal, setShowAlertModal] = useState(false)
 
   const [activeTab, setActiveTab] = useState('Dashboard')
   const [selectedCorridor, setSelectedCorridor] = useState('Ambaji')
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
-  const [alertReplyModal, setAlertReplyModal] = useState(null)
   const [pdfViewer, setPdfViewer] = useState(null)
 
-  const { corridorData, corridorHistory, connectionStatus, lastUpdate, busData } = useWebSocket()
+  const { corridorData, connectionStatus, busData } = useWebSocket()
   const { notifications, unreadCount, markRead, markAllRead } = useNotifications(corridorData, activeRole)
 
   // Handle alert reply requirement
   useEffect(() => {
-    if (!user || !corridorData) return
+    // Watch for new alerts from WebSocket data
+    const checkForAlerts = () => {
+      if (!corridorData) return
 
-    // Check for active alerts that need response
-    Object.values(corridorData).forEach(corridor => {
-      if (corridor.alert_active && corridor.alert_id && !alertReplyModal) {
-        // Show reply modal for this alert
-        setAlertReplyModal({
-          alert_id: corridor.alert_id,
-          corridor: corridor.corridor || selectedCorridor,
-          cpi: corridor.cpi,
-          surge_type: corridor.surge_type
+      Object.values(corridorData).forEach(data => {
+        if (!data?.alert_active || !data?.alert_id) return
+
+        const alertId = data.alert_id
+
+        // Skip if already dismissed or replied
+        if (dismissedAlerts.current.has(alertId)) return
+        if (repliedAlerts.current.has(alertId)) return
+
+        // Skip if modal already showing this exact alert
+        if (activeAlert?.alert_id === alertId) return
+
+        // This is a NEW alert — show modal
+        console.log('[ALERT] New alert detected:', alertId)
+        setActiveAlert({
+          alert_id: alertId,
+          corridor: data.corridor,
+          cpi: data.cpi,
+          surge_type: data.surge_type,
+          time_to_breach_minutes: data.time_to_breach_minutes,
+          ml_confidence: data.ml_confidence,
+          flow_rate: data.flow_rate
         })
-      }
-    })
-  }, [corridorData, user, alertReplyModal, selectedCorridor])
+        setShowAlertModal(true)
+      })
+    }
+
+    checkForAlerts()
+  }, [corridorData, activeAlert])  // Only runs when corridorData changes
 
   // Handle PDF ready notifications
   useEffect(() => {
@@ -103,6 +114,31 @@ export default function App() {
     })
   }, [notifications, markRead])
 
+  // Handle Cancel — dismiss this alert_id permanently for this browser session
+  function handleAlertCancel() {
+    if (activeAlert?.alert_id) {
+      dismissedAlerts.current.add(activeAlert.alert_id)
+      console.log('[ALERT] Dismissed:', activeAlert.alert_id)
+    }
+    setShowAlertModal(false)
+    setActiveAlert(null)
+  }
+
+  // Handle Submit — mark as replied
+  function handleAlertReplied() {
+    if (activeAlert?.alert_id) {
+      repliedAlerts.current.add(activeAlert.alert_id)
+      dismissedAlerts.current.add(activeAlert.alert_id)
+      console.log('[ALERT] Replied:', activeAlert.alert_id)
+    }
+    setShowAlertModal(false)
+    setActiveAlert(null)
+    // Show PDF viewer after reply
+    if (activeAlert?.alert_id) {
+      setPdfViewer(activeAlert.alert_id)
+    }
+  }
+
   const handleLogout = () => {
     if (token) {
       api.post('/api/logout', { token }).catch(() => {})
@@ -110,15 +146,10 @@ export default function App() {
     localStorage.removeItem('ts11_token')
     localStorage.removeItem('ts11_role')
     localStorage.removeItem('ts11_user')
-    setAlertReplyModal(null)
+    setShowAlertModal(false)
+    setActiveAlert(null)
     setPdfViewer(null)
     window.location.href = '/'
-  }
-
-  const handleAlertReplied = (alertId) => {
-    setAlertReplyModal(null)
-    // Show PDF viewer after reply
-    setPdfViewer(alertId)
   }
 
   const getConnectionStatusColor = () => {
@@ -620,14 +651,28 @@ export default function App() {
       </main>
 
       {/* Alert Reply Modal */}
-      {alertReplyModal && (
-        <AlertReplyModal
-          alert={alertReplyModal}
-          agency={user}
-          token={token}
-          onClose={() => setAlertReplyModal(null)}
-          onReplied={handleAlertReplied}
-        />
+      {showAlertModal && activeAlert && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          width: '100vw',
+          height: '100vh',
+          background: 'rgba(0,0,0,0.75)',
+          zIndex: 9999,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: '1rem'
+        }}>
+          <AlertReplyModal
+            alert={activeAlert}
+            agency={activeRole}
+            token={token}
+            onClose={handleAlertCancel}
+            onReplied={handleAlertReplied}
+          />
+        </div>
       )}
 
       {/* PDF Viewer */}

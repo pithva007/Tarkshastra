@@ -57,6 +57,8 @@ const ROLES = [
 ]
 
 export default function Login() {
+  console.log('[LOGIN] Component rendering')
+  
   const [selectedRole, setSelectedRole] = useState(null)
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
@@ -65,13 +67,16 @@ export default function Login() {
   const [systemStats, setSystemStats] = useState({ alerts: 0 })
 
   useEffect(() => {
+    console.log('[LOGIN] useEffect running')
     // Fetch system health for active alerts count
     fetch(`${API_URL}/health`)
       .then(res => res.json())
       .then(data => {
+        console.log('[LOGIN] Health data:', data)
         setSystemStats({ alerts: data.connections || 0 })
       })
-      .catch(() => {
+      .catch(err => {
+        console.error('[LOGIN] Health fetch error:', err)
         setSystemStats({ alerts: 0 })
       })
   }, [])

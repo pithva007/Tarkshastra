@@ -1,20 +1,30 @@
-import React, { useState, useEffect } from 'react'
-import axios from 'axios'
+import React, { useState, useEffect, useRef } from 'react'
+import { api } from '../utils/auth'
 
-const API = import.meta.env.VITE_API_URL || 'http://localhost:8000'
-
-const ACTION_TEMPLATES = {
+const ROLE_ACTIONS = {
   police: {
-    GENUINE_CRUSH: "Deploying officers to Choke Point B immediately. Estimated deployment time: 4 minutes.",
-    BUILDING: "Monitoring Choke Point B. On standby for deployment."
+    GENUINE_CRUSH: 'Deploying officers to Choke Point B immediately. Estimated deployment time: 4 minutes.',
+    BUILDING: 'Monitoring Choke Point B. On standby for deployment.',
+    SELF_RESOLVING: 'Observing situation. Ready to deploy if needed.',
+    SAFE: 'All clear. Standard monitoring active.'
   },
   gsrtc: {
-    GENUINE_CRUSH: "Holding all incoming buses at 3km checkpoint. 8 buses held. No additional dispatches.",
-    BUILDING: "Slowing incoming buses. Monitoring capacity."
+    GENUINE_CRUSH: 'Holding all incoming buses at 3km checkpoint. No additional dispatches.',
+    BUILDING: 'Slowing incoming buses. Monitoring capacity.',
+    SELF_RESOLVING: 'Buses on reduced speed. Monitoring situation.',
+    SAFE: 'Normal schedule. No holds required.'
   },
   temple: {
-    GENUINE_CRUSH: "Activating darshan hold at inner gate. Redirecting pilgrims to Queue C.",
-    BUILDING: "Preparing darshan hold. Alerting gate staff."
+    GENUINE_CRUSH: 'Activating darshan hold at inner gate. Redirecting pilgrims to Queue C.',
+    BUILDING: 'Preparing darshan hold. Alerting gate staff.',
+    SELF_RESOLVING: 'Monitoring crowd. Prepared to activate hold.',
+    SAFE: 'Normal operations. Darshan proceeding.'
+  },
+  admin: {
+    GENUINE_CRUSH: 'Coordinating all agency responses. Monitoring situation.',
+    BUILDING: 'Alerting all agencies. Monitoring build-up.',
+    SELF_RESOLVING: 'Monitoring self-resolution. Agencies on standby.',
+    SAFE: 'All systems normal.'
   }
 }
 
@@ -22,469 +32,445 @@ const STATUS_OPTIONS = [
   {
     value: 'ACKNOWLEDGED',
     label: 'Acknowledged',
-    description: 'Received alert, taking action',
-    color: '#3b82f6',
-    svg: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-      <path d="M9 12l2 2 4-4"/>
-      <circle cx="12" cy="12" r="9"/>
-    </svg>`
+    desc: 'Received alert, taking action',
+    color: '#3B82F6',
+    svg: (
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+        <circle cx="12" cy="12" r="10"/>
+        <path d="M9 12l2 2 4-4"/>
+      </svg>
+    )
   },
   {
     value: 'IN_PROGRESS',
     label: 'In Progress',
-    description: 'Action underway',
-    color: '#f59e0b',
-    svg: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-      <circle cx="12" cy="12" r="10"/>
-      <polyline points="12,6 12,12 16,14"/>
-    </svg>`
+    desc: 'Action underway',
+    color: '#F59E0B',
+    svg: (
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+        <circle cx="12" cy="12" r="10"/>
+        <path d="M12 6v6l4 2"/>
+      </svg>
+    )
   },
   {
     value: 'COMPLETED',
     label: 'Completed',
-    description: 'Action completed, situation managed',
+    desc: 'Action completed, situation managed',
     color: '#22c55e',
-    svg: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-      <path d="M9 12l2 2 4-4"/>
-      <path d="M21 12c0 4.97-4.03 9-9 9s-9-4.03-9-9 4.03-9 9-9c2.35 0 4.48.9 6.08 2.38"/>
-      <path d="M17 6l-3 3"/>
-    </svg>`
+    svg: (
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+        <path d="M20 6L9 17l-5-5"/>
+      </svg>
+    )
   },
   {
     value: 'ESCALATED',
     label: 'Escalated',
-    description: 'Escalating to higher authority',
-    color: '#ef4444',
-    svg: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-      <line x1="12" y1="19" x2="12" y2="5"/>
-      <polyline points="5,12 12,5 19,12"/>
-    </svg>`
+    desc: 'Escalating to higher authority',
+    color: '#EF4444',
+    svg: (
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+        <path d="M12 19V5M5 12l7-7 7 7"/>
+      </svg>
+    )
   }
 ]
 
 export default function AlertReplyModal({ alert, agency, token, onClose, onReplied }) {
-  const [actionTaken, setActionTaken] = useState('')
+  const surgeType = alert?.surge_type || 'GENUINE_CRUSH'
+  const defaultAction = ROLE_ACTIONS[agency]?.[surgeType] ||
+                        ROLE_ACTIONS[agency]?.['GENUINE_CRUSH'] ||
+                        'Taking immediate action.'
+
+  const [actionText, setActionText] = useState(defaultAction)
   const [status, setStatus] = useState('ACKNOWLEDGED')
   const [notes, setNotes] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [submitted, setSubmitted] = useState(false)
-  const [submitTime, setSubmitTime] = useState('')
-  const [ackTime, setAckTime] = useState(0)
+  const [error, setError] = useState('')
+
+  // Timer — always starts at 90
+  const [timeLeft, setTimeLeft] = useState(90)
+  const alertStartRef = useRef(Date.now())
 
   useEffect(() => {
-    if (alert && agency) {
-      // Pre-fill action based on role and surge type
-      const template = ACTION_TEMPLATES[agency.role]?.[alert.surge_type] || 
-                      `Responding to ${alert.corridor} alert. Taking appropriate action.`
-      setActionTaken(template)
-    }
+    // Reset timer when new alert comes in
+    setTimeLeft(90)
+    alertStartRef.current = Date.now()
+  }, [alert?.alert_id])
 
-    // Start acknowledgment timer
-    const startTime = Date.now()
-    const timer = setInterval(() => {
-      setAckTime(Math.floor((Date.now() - startTime) / 1000))
+  useEffect(() => {
+    if (submitted) return
+    if (timeLeft <= 0) return
+
+    const interval = setInterval(() => {
+      setTimeLeft(prev => {
+        if (prev <= 1) {
+          clearInterval(interval)
+          return 0
+        }
+        return prev - 1
+      })
     }, 1000)
 
-    return () => clearInterval(timer)
-  }, [alert, agency])
+    return () => clearInterval(interval)
+  }, [submitted, alert?.alert_id])
 
-  const handleSubmit = async (e) => {
-    e.preventDefault()
-    if (!actionTaken.trim() || submitting) return
+  const timerColor = timeLeft > 30 
+    ? '#22c55e' 
+    : timeLeft > 10 
+    ? '#F59E0B' 
+    : '#EF4444'
+
+  const formatTime = (s) => {
+    const m = Math.floor(s / 60)
+    const sec = s % 60
+    return `${m}:${sec.toString().padStart(2, '0')}`
+  }
+
+  const ackTimeSeconds = 90 - timeLeft
+
+  async function handleSubmit() {
+    if (!actionText.trim()) {
+      setError('Please describe the action being taken')
+      return
+    }
 
     setSubmitting(true)
+    setError('')
 
     try {
-      await axios.post(`${API}/api/alert/reply`, {
+      await api.post('/api/alert/reply', {
         token,
         alert_id: alert.alert_id,
         corridor: alert.corridor,
-        action_taken: actionTaken,
+        action_taken: actionText,
         status,
-        notes: notes.trim(),
-        ack_time_seconds: ackTime
+        notes,
+        ack_time_seconds: ackTimeSeconds
       })
 
-      const now = new Date()
-      setSubmitTime(now.toLocaleTimeString())
       setSubmitted(true)
-      
-      if (onReplied) {
-        onReplied(alert.alert_id)
-      }
-    } catch (error) {
-      console.error('Failed to submit reply:', error)
-      alert('Failed to submit reply. Please try again.')
-    } finally {
+
+      // Close and notify parent after 1.5 seconds
+      setTimeout(() => {
+        onReplied()
+      }, 1500)
+
+    } catch (err) {
+      console.error('[REPLY] Error:', err)
+      setError(err.response?.data?.detail || 'Failed to submit. Check connection.')
       setSubmitting(false)
     }
   }
 
-  const handleViewPDF = () => {
-    window.open(`${API}/api/report/${alert.alert_id}`, '_blank')
-  }
-
-  const selectedStatus = STATUS_OPTIONS.find(s => s.value === status)
-
+  // Submitted confirmation screen
   if (submitted) {
     return (
       <div style={{
-        position: 'fixed',
-        inset: 0,
-        background: 'rgba(0, 0, 0, 0.8)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        zIndex: 1000,
-        backdropFilter: 'blur(4px)'
+        background: '#1e293b',
+        borderRadius: '16px',
+        padding: '2rem',
+        width: '100%',
+        maxWidth: '520px',
+        textAlign: 'center'
       }}>
         <div style={{
-          background: '#1e293b',
-          border: '1px solid #334155',
-          borderRadius: '16px',
-          padding: '32px',
-          maxWidth: '400px',
-          width: '90%',
-          textAlign: 'center'
+          width: '56px', 
+          height: '56px',
+          background: '#14532d',
+          borderRadius: '50%',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          margin: '0 auto 1rem'
         }}>
-          <div style={{
-            width: '64px',
-            height: '64px',
-            background: '#22c55e',
-            borderRadius: '50%',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            margin: '0 auto 24px'
-          }}>
-            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2">
-              <path d="M9 12l2 2 4-4"/>
-              <circle cx="12" cy="12" r="9"/>
-            </svg>
-          </div>
-
-          <h3 style={{
-            fontSize: '20px',
-            fontWeight: '600',
-            color: '#f1f5f9',
-            marginBottom: '8px'
-          }}>
-            Reply Submitted
-          </h3>
-
-          <p style={{
-            color: '#94a3b8',
-            marginBottom: '24px',
-            fontSize: '14px'
-          }}>
-            Reply submitted at {submitTime}
-          </p>
-
-          <div style={{
-            display: 'flex',
-            gap: '12px',
-            justifyContent: 'center'
-          }}>
-            <button
-              onClick={handleViewPDF}
-              style={{
-                padding: '10px 20px',
-                background: '#3b82f6',
-                color: 'white',
-                border: 'none',
-                borderRadius: '8px',
-                fontSize: '14px',
-                fontWeight: '500',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px'
-              }}
-            >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-                <polyline points="14,2 14,8 20,8"/>
-                <line x1="16" y1="13" x2="8" y2="13"/>
-                <line x1="16" y1="17" x2="8" y2="17"/>
-                <polyline points="10,9 9,9 8,9"/>
-              </svg>
-              View PDF Report
-            </button>
-
-            <button
-              onClick={onClose}
-              style={{
-                padding: '10px 20px',
-                background: '#374151',
-                color: '#f1f5f9',
-                border: 'none',
-                borderRadius: '8px',
-                fontSize: '14px',
-                fontWeight: '500',
-                cursor: 'pointer'
-              }}
-            >
-              Close
-            </button>
-          </div>
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#22c55e" strokeWidth="2.5">
+            <path d="M20 6L9 17l-5-5"/>
+          </svg>
         </div>
+
+        <div style={{
+          fontSize: '18px',
+          fontWeight: '600',
+          color: '#f1f5f9',
+          marginBottom: '8px'
+        }}>
+          Reply Submitted
+        </div>
+
+        <div style={{
+          fontSize: '13px',
+          color: '#94a3b8',
+          marginBottom: '1rem'
+        }}>
+          Response logged for Alert {alert.alert_id}
+        </div>
+
+        <button
+          onClick={() => {
+            const url = `${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/api/report/${alert.alert_id}`
+            window.open(url, '_blank')
+          }}
+          style={{
+            background: '#1e3a5f',
+            color: '#60a5fa',
+            border: '1px solid #3B82F6',
+            borderRadius: '8px',
+            padding: '8px 16px',
+            fontSize: '13px',
+            cursor: 'pointer'
+          }}
+        >
+          View Incident Report PDF
+        </button>
       </div>
     )
   }
 
   return (
     <div style={{
-      position: 'fixed',
-      inset: 0,
-      background: 'rgba(0, 0, 0, 0.8)',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      zIndex: 1000,
-      backdropFilter: 'blur(4px)'
+      background: '#1e293b',
+      borderRadius: '16px',
+      padding: '1.5rem',
+      width: '100%',
+      maxWidth: '540px',
+      border: '1px solid #334155',
+      maxHeight: '90vh',
+      overflowY: 'auto'
     }}>
+      {/* Header */}
       <div style={{
-        background: '#1e293b',
-        border: '1px solid #334155',
-        borderRadius: '16px',
-        padding: '24px',
-        maxWidth: '600px',
-        width: '90%',
-        maxHeight: '90vh',
-        overflow: 'auto'
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'flex-start',
+        marginBottom: '1.25rem'
       }}>
-        {/* Header */}
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          marginBottom: '24px',
-          paddingBottom: '16px',
-          borderBottom: '1px solid #334155'
-        }}>
-          <div>
-            <h2 style={{
-              fontSize: '20px',
-              fontWeight: '600',
-              color: '#f1f5f9',
-              marginBottom: '4px'
-            }}>
-              Alert Response Required
-            </h2>
-            <p style={{
-              color: '#94a3b8',
-              fontSize: '14px'
-            }}>
-              {alert.corridor} • CPI {alert.cpi?.toFixed(3)} • {alert.surge_type}
-            </p>
-          </div>
-          
+        <div>
           <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '12px',
-            color: '#94a3b8',
-            fontSize: '14px'
+            fontSize: '17px',
+            fontWeight: '600',
+            color: '#f1f5f9',
+            marginBottom: '4px'
           }}>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-              <circle cx="12" cy="12" r="10"/>
-              <polyline points="12,6 12,12 16,14"/>
-            </svg>
-            {Math.floor(ackTime / 60)}:{(ackTime % 60).toString().padStart(2, '0')}
+            Alert Response Required
+          </div>
+          <div style={{
+            fontSize: '12px',
+            color: '#94a3b8'
+          }}>
+            {alert?.corridor} · CPI {alert?.cpi?.toFixed(3)} · {surgeType}
           </div>
         </div>
 
-        <form onSubmit={handleSubmit}>
-          {/* Action Taken */}
-          <div style={{ marginBottom: '20px' }}>
-            <label style={{
-              display: 'block',
-              fontSize: '14px',
-              fontWeight: '500',
-              color: '#f1f5f9',
-              marginBottom: '8px'
-            }}>
-              Action Being Taken
-            </label>
-            <textarea
-              value={actionTaken}
-              onChange={(e) => setActionTaken(e.target.value)}
-              rows={3}
-              style={{
-                width: '100%',
-                padding: '12px',
-                background: '#0f172a',
-                border: '1px solid #334155',
-                borderRadius: '8px',
-                color: '#f1f5f9',
-                fontSize: '14px',
-                resize: 'vertical',
-                outline: 'none'
-              }}
-              placeholder="Describe the action you are taking in response to this alert..."
-              required
-            />
-          </div>
+        {/* Timer */}
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '6px',
+          color: timerColor,
+          fontSize: '15px',
+          fontWeight: '600',
+          background: '#0f172a',
+          padding: '6px 12px',
+          borderRadius: '8px',
+          border: `1px solid ${timerColor}40`
+        }}>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={timerColor} strokeWidth="2">
+            <circle cx="12" cy="12" r="10"/>
+            <path d="M12 6v6l4 2"/>
+          </svg>
+          {formatTime(timeLeft)}
+        </div>
+      </div>
 
-          {/* Status Selection */}
-          <div style={{ marginBottom: '20px' }}>
-            <label style={{
-              display: 'block',
-              fontSize: '14px',
-              fontWeight: '500',
-              color: '#f1f5f9',
-              marginBottom: '12px'
-            }}>
-              Status
-            </label>
-            <div style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))',
-              gap: '8px'
-            }}>
-              {STATUS_OPTIONS.map(option => (
-                <label
-                  key={option.value}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '8px',
-                    padding: '12px',
-                    background: status === option.value ? `${option.color}20` : '#0f172a',
-                    border: `1px solid ${status === option.value ? option.color : '#334155'}`,
-                    borderRadius: '8px',
-                    cursor: 'pointer',
-                    transition: 'all 0.2s ease'
-                  }}
-                >
-                  <input
-                    type="radio"
-                    name="status"
-                    value={option.value}
-                    checked={status === option.value}
-                    onChange={(e) => setStatus(e.target.value)}
-                    style={{ display: 'none' }}
-                  />
-                  <div 
-                    style={{ 
-                      width: '16px', 
-                      height: '16px', 
-                      color: option.color,
-                      flexShrink: 0
-                    }}
-                    dangerouslySetInnerHTML={{ __html: option.svg }}
-                  />
-                  <div>
-                    <div style={{
-                      fontSize: '12px',
-                      fontWeight: '500',
-                      color: '#f1f5f9'
-                    }}>
-                      {option.label}
-                    </div>
-                    <div style={{
-                      fontSize: '10px',
-                      color: '#94a3b8'
-                    }}>
-                      {option.description}
-                    </div>
-                  </div>
-                </label>
-              ))}
-            </div>
-          </div>
+      {/* Action text */}
+      <div style={{ marginBottom: '1rem' }}>
+        <label style={{
+          fontSize: '12px',
+          color: '#64748b',
+          fontWeight: '500',
+          textTransform: 'uppercase',
+          letterSpacing: '0.06em',
+          display: 'block',
+          marginBottom: '6px'
+        }}>
+          Action Being Taken
+        </label>
+        <textarea
+          value={actionText}
+          onChange={e => setActionText(e.target.value)}
+          rows={3}
+          style={{
+            width: '100%',
+            background: '#0f172a',
+            border: '1px solid #334155',
+            borderRadius: '8px',
+            padding: '10px 12px',
+            color: '#f1f5f9',
+            fontSize: '13px',
+            resize: 'vertical',
+            fontFamily: 'system-ui'
+          }}
+        />
+      </div>
 
-          {/* Notes */}
-          <div style={{ marginBottom: '24px' }}>
-            <label style={{
-              display: 'block',
-              fontSize: '14px',
-              fontWeight: '500',
-              color: '#f1f5f9',
-              marginBottom: '8px'
-            }}>
-              Additional Notes (Optional)
-            </label>
-            <textarea
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              rows={2}
-              style={{
-                width: '100%',
-                padding: '12px',
-                background: '#0f172a',
-                border: '1px solid #334155',
-                borderRadius: '8px',
-                color: '#f1f5f9',
-                fontSize: '14px',
-                resize: 'vertical',
-                outline: 'none'
-              }}
-              placeholder="Any additional information or context..."
-            />
-          </div>
-
-          {/* Submit Button */}
-          <div style={{
-            display: 'flex',
-            gap: '12px',
-            justifyContent: 'flex-end'
-          }}>
+      {/* Status options */}
+      <div style={{ marginBottom: '1rem' }}>
+        <label style={{
+          fontSize: '12px',
+          color: '#64748b',
+          fontWeight: '500',
+          textTransform: 'uppercase',
+          letterSpacing: '0.06em',
+          display: 'block',
+          marginBottom: '8px'
+        }}>
+          Status
+        </label>
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: '1fr 1fr',
+          gap: '8px'
+        }}>
+          {STATUS_OPTIONS.map(opt => (
             <button
-              type="button"
-              onClick={onClose}
-              disabled={submitting}
+              key={opt.value}
+              onClick={() => setStatus(opt.value)}
               style={{
-                padding: '12px 24px',
-                background: '#374151',
-                color: '#f1f5f9',
-                border: 'none',
+                background: status === opt.value 
+                  ? `${opt.color}18` 
+                  : '#0f172a',
+                border: `1.5px solid ${status === opt.value 
+                  ? opt.color 
+                  : '#334155'}`,
                 borderRadius: '8px',
-                fontSize: '14px',
-                fontWeight: '500',
-                cursor: submitting ? 'not-allowed' : 'pointer',
-                opacity: submitting ? 0.5 : 1
-              }}
-            >
-              Cancel
-            </button>
-            
-            <button
-              type="submit"
-              disabled={submitting || !actionTaken.trim()}
-              style={{
-                padding: '12px 24px',
-                background: submitting || !actionTaken.trim() ? '#64748b' : selectedStatus?.color || '#3b82f6',
-                color: 'white',
-                border: 'none',
-                borderRadius: '8px',
-                fontSize: '14px',
-                fontWeight: '500',
-                cursor: submitting || !actionTaken.trim() ? 'not-allowed' : 'pointer',
+                padding: '10px 12px',
+                cursor: 'pointer',
+                textAlign: 'left',
                 display: 'flex',
-                alignItems: 'center',
-                gap: '8px'
+                alignItems: 'flex-start',
+                gap: '8px',
+                color: status === opt.value 
+                  ? opt.color 
+                  : '#94a3b8',
+                transition: 'all 0.15s'
               }}
             >
-              {submitting ? (
-                <>
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <path d="M21 12a9 9 0 11-6.219-8.56"/>
-                  </svg>
-                  Submitting...
-                </>
-              ) : (
-                <>
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                    <path d="M9 12l2 2 4-4"/>
-                    <circle cx="12" cy="12" r="9"/>
-                  </svg>
-                  Submit Reply
-                </>
-              )}
+              <span style={{ marginTop: '1px', flexShrink: 0 }}>
+                {opt.svg}
+              </span>
+              <span>
+                <div style={{
+                  fontSize: '13px',
+                  fontWeight: '500'
+                }}>
+                  {opt.label}
+                </div>
+                <div style={{
+                  fontSize: '11px',
+                  opacity: 0.7,
+                  marginTop: '2px'
+                }}>
+                  {opt.desc}
+                </div>
+              </span>
             </button>
-          </div>
-        </form>
+          ))}
+        </div>
+      </div>
+
+      {/* Notes */}
+      <div style={{ marginBottom: '1.25rem' }}>
+        <label style={{
+          fontSize: '12px',
+          color: '#64748b',
+          fontWeight: '500',
+          textTransform: 'uppercase',
+          letterSpacing: '0.06em',
+          display: 'block',
+          marginBottom: '6px'
+        }}>
+          Additional Notes (Optional)
+        </label>
+        <textarea
+          value={notes}
+          onChange={e => setNotes(e.target.value)}
+          placeholder="Any additional information or context..."
+          rows={2}
+          style={{
+            width: '100%',
+            background: '#0f172a',
+            border: '1px solid #334155',
+            borderRadius: '8px',
+            padding: '10px 12px',
+            color: '#f1f5f9',
+            fontSize: '13px',
+            resize: 'vertical',
+            fontFamily: 'system-ui'
+          }}
+        />
+      </div>
+
+      {error && (
+        <div style={{
+          background: '#7f1d1d',
+          color: '#fca5a5',
+          padding: '8px 12px',
+          borderRadius: '6px',
+          fontSize: '12px',
+          marginBottom: '1rem'
+        }}>
+          {error}
+        </div>
+      )}
+
+      {/* Buttons */}
+      <div style={{
+        display: 'flex',
+        gap: '10px',
+        justifyContent: 'flex-end'
+      }}>
+        <button
+          onClick={onClose}
+          style={{
+            background: 'transparent',
+            border: '1px solid #334155',
+            color: '#94a3b8',
+            borderRadius: '8px',
+            padding: '10px 20px',
+            fontSize: '13px',
+            fontWeight: '500',
+            cursor: 'pointer'
+          }}
+        >
+          Cancel
+        </button>
+
+        <button
+          onClick={handleSubmit}
+          disabled={submitting}
+          style={{
+            background: submitting ? '#374151' : '#2563eb',
+            border: 'none',
+            color: 'white',
+            borderRadius: '8px',
+            padding: '10px 20px',
+            fontSize: '13px',
+            fontWeight: '600',
+            cursor: submitting ? 'not-allowed' : 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px'
+          }}
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2">
+            <circle cx="12" cy="12" r="10"/>
+            <path d="M9 12l2 2 4-4"/>
+          </svg>
+          {submitting ? 'Submitting...' : 'Submit Reply'}
+        </button>
       </div>
     </div>
   )
