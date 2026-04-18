@@ -5,9 +5,3 @@ numpy==1.26.4
 pandas==2.2.2
 aiosqlite==0.20.0
 python-multipart==0.0.9
-openpyxl==3.1.2
-# ML dependencies
-xgboost>=2.0.0
-scikit-learn>=1.4.0
-imbalanced-learn>=0.12.0
-joblib>=1.3.0
