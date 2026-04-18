@@ -71,6 +71,22 @@ async def init_db():
             )
         """)
 
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS call_log (
+                id           INTEGER PRIMARY KEY AUTOINCREMENT,
+                alert_id     TEXT    NOT NULL,
+                corridor     TEXT    NOT NULL,
+                role         TEXT    NOT NULL,
+                phone_number TEXT,
+                call_sid     TEXT,
+                status       TEXT,
+                reason       TEXT,
+                cpi          REAL,
+                surge_type   TEXT,
+                called_at    TEXT    NOT NULL
+            )
+        """)
+
         # Migration: add ml_confidence column if it doesn't exist yet
         try:
             await db.execute("ALTER TABLE alerts ADD COLUMN ml_confidence REAL DEFAULT NULL")
@@ -267,3 +283,43 @@ async def get_historical_incidents(corridor: str = None) -> list:
 
 def _now() -> str:
     return datetime.now(timezone.utc).isoformat()
+
+
+# ── Call log ──────────────────────────────────────────────────────────────────
+
+async def log_call(
+    db,
+    alert_id: str,
+    corridor: str,
+    role: str,
+    phone_number: str,
+    call_sid: str,
+    status: str,
+    reason: str,
+    cpi: float,
+    surge_type: str,
+):
+    called_at = datetime.now(timezone.utc).isoformat()
+    await db.execute(
+        """INSERT INTO call_log
+           (alert_id, corridor, role, phone_number, call_sid,
+            status, reason, cpi, surge_type, called_at)
+           VALUES (?,?,?,?,?,?,?,?,?,?)""",
+        (
+            alert_id, corridor, role, phone_number, call_sid,
+            status, reason, cpi, surge_type, called_at,
+        ),
+    )
+    await db.commit()
+
+
+async def get_call_log(db, limit: int = 50) -> list:
+    cursor = await db.execute(
+        "SELECT * FROM call_log ORDER BY called_at DESC LIMIT ?",
+        (limit,),
+    )
+    rows = await cursor.fetchall()
+    return [
+        dict(zip([col[0] for col in cursor.description], row))
+        for row in rows
+    ]

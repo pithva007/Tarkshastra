@@ -20,11 +20,14 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 import uvicorn
 
+import aiosqlite
+
 from database import (
     init_db, insert_alert, ack_alert, get_alerts, log_cpi, get_events,
     get_alert_by_id, insert_notification, get_notifications,
-    get_historical_incidents,
+    get_historical_incidents, log_call, get_call_log,
 )
+from call_service import trigger_corridor_calls, make_alert_call
 from replay_data import REPLAY_FRAMES
 from bus_simulator import get_bus_update_message, update_destination_cpi
 from historical import get_historical_for_corridor, get_seasonal_prediction
@@ -124,6 +127,10 @@ class ConnectionManager:
 
 
 manager = ConnectionManager()
+
+# Track which alert_ids have already triggered calls
+# Prevents duplicate calls for same alert
+called_alert_ids: set = set()
 
 # ── Corridor simulator state ──────────────────────────────────────────────────
 CORRIDORS = ["Ambaji", "Dwarka", "Somnath", "Pavagadh"]
@@ -254,6 +261,28 @@ async def run_simulator():
 
                     await manager.broadcast(reading)
                     print(f"[sim] {corridor}: CPI={reading['cpi']} {reading['surge_type']}")
+
+                    # === PHONE CALL TRIGGER ===
+                    if (
+                        reading.get("alert_active")
+                        and reading.get("surge_type") == "GENUINE_CRUSH"
+                        and reading.get("cpi", 0) >= 0.85
+                        and reading.get("alert_id") not in called_alert_ids
+                    ):
+                        called_alert_ids.add(reading["alert_id"])
+                        print(
+                            f"[CALLS] Triggering calls for {corridor} "
+                            f"alert {reading['alert_id']}"
+                        )
+                        asyncio.create_task(
+                            trigger_calls_and_log(
+                                corridor=corridor,
+                                cpi=reading["cpi"],
+                                ttb_minutes=reading.get("time_to_breach_minutes") or 0,
+                                surge_type=reading["surge_type"],
+                                alert_id=reading["alert_id"],
+                            )
+                        )
 
                 except Exception as corridor_err:
                     print(f"[simulator] Error for {corridor}: {corridor_err}")
@@ -624,6 +653,106 @@ async def historical(corridor: str):
 async def seasonal_prediction(corridor: str, hour: Optional[int] = None):
     prediction = get_seasonal_prediction(corridor, current_hour=hour)
     return prediction
+
+
+# ── Call alert helpers ────────────────────────────────────────────────────────
+
+async def trigger_calls_and_log(
+    corridor: str,
+    cpi: float,
+    ttb_minutes: float,
+    surge_type: str,
+    alert_id: str,
+):
+    """Background task: trigger calls and log results to DB + broadcast."""
+    results = trigger_corridor_calls(
+        corridor=corridor,
+        cpi=cpi,
+        ttb_minutes=ttb_minutes,
+        surge_type=surge_type,
+        alert_id=alert_id,
+    )
+
+    async with aiosqlite.connect("stampede.db") as db:
+        for r in results:
+            await log_call(
+                db=db,
+                alert_id=alert_id,
+                corridor=corridor,
+                role=r.get("role", ""),
+                phone_number=r.get("number", ""),
+                call_sid=r.get("sid", ""),
+                status=r.get("status", ""),
+                reason=r.get("reason", ""),
+                cpi=cpi,
+                surge_type=surge_type,
+            )
+
+    # Broadcast call status to all connected dashboards
+    await manager.broadcast({
+        "type":      "call_update",
+        "alert_id":  alert_id,
+        "corridor":  corridor,
+        "calls":     results,
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+    })
+    print(f"[CALLS DONE] {len(results)} calls processed for {corridor}")
+
+
+# ── Call alert endpoints ──────────────────────────────────────────────────────
+
+@app.post("/api/call-alert")
+async def manual_call_alert(data: dict):
+    """Manual call trigger — for demo/testing.
+    Body: {corridor, role, phone, cpi, ttb_minutes, surge_type, alert_id}
+    """
+    result = make_alert_call(
+        to_number=data.get("phone", ""),
+        role=data.get("role", "police"),
+        corridor=data.get("corridor", "Ambaji"),
+        cpi=float(data.get("cpi", 0.85)),
+        ttb_minutes=float(data.get("ttb_minutes", 10)),
+        surge_type=data.get("surge_type", "GENUINE_CRUSH"),
+        alert_id=data.get("alert_id", "MANUAL_TEST"),
+    )
+
+    async with aiosqlite.connect("stampede.db") as db:
+        await log_call(
+            db=db,
+            alert_id=data.get("alert_id", "MANUAL_TEST"),
+            corridor=data.get("corridor", "Ambaji"),
+            role=data.get("role", "police"),
+            phone_number=data.get("phone", ""),
+            call_sid=result.get("sid", ""),
+            status=result.get("status", ""),
+            reason=result.get("reason", ""),
+            cpi=float(data.get("cpi", 0.85)),
+            surge_type=data.get("surge_type", "GENUINE_CRUSH"),
+        )
+
+    return result
+
+
+@app.get("/api/call-log")
+async def get_calls(limit: int = 50):
+    """Get recent call history."""
+    async with aiosqlite.connect("stampede.db") as db:
+        return await get_call_log(db, limit)
+
+
+@app.get("/api/call-log/{alert_id}")
+async def get_calls_for_alert(alert_id: str):
+    """Get all calls made for a specific alert."""
+    async with aiosqlite.connect("stampede.db") as db:
+        cursor = await db.execute(
+            "SELECT * FROM call_log WHERE alert_id = ? ORDER BY called_at DESC",
+            (alert_id,),
+        )
+        rows = await cursor.fetchall()
+        return [
+            dict(zip([col[0] for col in cursor.description], row))
+            for row in rows
+        ]
 
 
 # ── Entry point ───────────────────────────────────────────────────────────────
