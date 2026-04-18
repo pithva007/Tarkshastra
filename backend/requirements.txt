@@ -5,3 +5,5 @@ numpy==1.26.4
 pandas==2.2.2
 aiosqlite==0.20.0
 python-multipart==0.0.9
+scikit-learn==1.4.2
+joblib==1.4.2

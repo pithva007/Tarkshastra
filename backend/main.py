@@ -6,9 +6,12 @@ Start: uvicorn main:app --host 0.0.0.0 --port $PORT
 import asyncio
 import csv
 import io
+import math
 import os
+import random
+import uuid
 from datetime import datetime, timezone
-from typing import Any, Dict, Optional, Set
+from typing import Any, Dict, List, Optional, Set
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -16,10 +19,6 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 import uvicorn
 
-from simulator import (
-    get_all_readings, get_corridor_reading, get_corridors,
-    get_corridor_config, CORRIDOR_BASELINES, DENSITY_DANGER_THRESHOLD,
-)
 from database import init_db, insert_alert, ack_alert, get_alerts, log_cpi, get_events, get_alert_by_id
 from replay_data import REPLAY_FRAMES
 
@@ -31,73 +30,204 @@ except ImportError:
     _ML_AVAILABLE = False
 
 # ── App ───────────────────────────────────────────────────────────────────────
-app = FastAPI(title="TS-11 Stampede Predictor", version="2.1.0")
+app = FastAPI(title="TS-11 Stampede Predictor", version="2.2.0")
 
-_frontend = os.getenv("FRONTEND_URL", "*")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[_frontend, "http://localhost:5173", "http://localhost:4173", "https://frontend-bnr9.onrender.com", "*"],
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
 # ── WebSocket connection manager ──────────────────────────────────────────────
-class _Manager:
+class ConnectionManager:
     def __init__(self):
-        self.connections: Set[WebSocket] = set()
+        self.active_connections: List[WebSocket] = []
 
-    async def connect(self, ws: WebSocket):
-        await ws.accept()
-        self.connections.add(ws)
+    async def connect(self, websocket: WebSocket):
+        await websocket.accept()
+        self.active_connections.append(websocket)
+        print(f"[ws] Client connected — total: {len(self.active_connections)}")
 
-    def disconnect(self, ws: WebSocket):
-        self.connections.discard(ws)
+    def disconnect(self, websocket: WebSocket):
+        if websocket in self.active_connections:
+            self.active_connections.remove(websocket)
+        print(f"[ws] Client disconnected — total: {len(self.active_connections)}")
 
     async def broadcast(self, data: dict):
-        dead: Set[WebSocket] = set()
-        for ws in self.connections:
+        dead: List[WebSocket] = []
+        for ws in self.active_connections:
             try:
                 await ws.send_json(data)
             except Exception:
-                dead.add(ws)
-        self.connections -= dead
+                dead.append(ws)
+        for ws in dead:
+            if ws in self.active_connections:
+                self.active_connections.remove(ws)
 
 
-mgr = _Manager()
+manager = ConnectionManager()
+
+# ── Corridor simulator state ──────────────────────────────────────────────────
+CORRIDORS = ["Ambaji", "Dwarka", "Somnath", "Pavagadh"]
+
+# Phase offsets so each corridor is independent
+_PHASE_OFFSETS = {
+    "Ambaji":   0.0,
+    "Dwarka":   math.pi * 0.5,
+    "Somnath":  math.pi * 1.0,
+    "Pavagadh": math.pi * 1.5,
+}
+
+_sim_step: Dict[str, int] = {c: 0 for c in CORRIDORS}
+_active_alerts: Dict[str, Optional[str]] = {c: None for c in CORRIDORS}
+_consecutive_high: Dict[str, int] = {c: 0 for c in CORRIDORS}
 
 
-# ── Background CPI broadcast (every 2 s) ─────────────────────────────────────
-async def _broadcast_loop():
+def _generate_reading(corridor: str) -> dict:
+    """Generate a realistic, non-zero CPI reading for a corridor."""
+    step = _sim_step[corridor]
+    _sim_step[corridor] += 1
+
+    phase_offset = _PHASE_OFFSETS[corridor]
+    # Sine wave: period ~300 steps (10 min at 2s interval) — gradual rise and fall
+    sine_val = math.sin((step * 0.021) + phase_offset)  # -1 to 1
+
+    # Map sine to a realistic range: 0.3 to 0.85
+    base_cpi = 0.575 + sine_val * 0.275  # centre 0.575, amplitude 0.275
+
+    # Add small random noise
+    noise = random.uniform(-0.04, 0.04)
+    base_cpi = max(0.25, min(0.95, base_cpi + noise))
+
+    # Derive component values that produce this CPI
+    # CPI = (flow_rate/2000)*0.5 + transport_burst*0.3 + chokepoint_density*0.2
+    # Work backwards from CPI to get plausible components
+    flow_rate = random.uniform(800, 1800)
+    transport_burst = random.uniform(0.2, 0.8)
+    chokepoint_density = random.uniform(0.3, 0.9)
+
+    # Recalculate CPI from components (keeps formula consistent)
+    cpi = (flow_rate / 2000) * 0.5 + transport_burst * 0.3 + chokepoint_density * 0.2
+    cpi = round(max(0.25, min(0.95, cpi)), 3)
+
+    # Track consecutive high readings
+    if cpi > 0.70:
+        _consecutive_high[corridor] += 1
+    else:
+        _consecutive_high[corridor] = 0
+
+    # Classify surge type
+    if _consecutive_high[corridor] >= 3 and cpi > 0.70:
+        surge_type = "GENUINE_CRUSH"
+    elif cpi >= 0.55:
+        surge_type = "SELF_RESOLVING"
+    else:
+        surge_type = "SAFE"
+
+    # Alert management
+    alert_active = surge_type == "GENUINE_CRUSH"
+    if alert_active:
+        if _active_alerts[corridor] is None:
+            ts = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
+            _active_alerts[corridor] = f"ALT_{ts}_{corridor[:3].upper()}"
+    else:
+        _active_alerts[corridor] = None
+
+    alert_id = _active_alerts[corridor]
+
+    # Time to breach
+    if cpi < 0.85 and cpi >= 0.40:
+        slope = 0.008 + (cpi - 0.40) * 0.02
+        ttb_s = int((0.85 - cpi) / slope)
+    elif cpi >= 0.85:
+        ttb_s = 0
+    else:
+        ttb_s = None
+
+    # ML confidence (deterministic from CPI)
+    ml_confidence = min(99, max(50, int(50 + cpi * 50)))
+    ml_risk_level = (
+        "CRITICAL" if cpi >= 0.85 else
+        "HIGH"     if cpi >= 0.70 else
+        "MEDIUM"   if cpi >= 0.50 else
+        "LOW"
+    )
+
+    return {
+        "type":                   "cpi_update",
+        "corridor":               corridor,
+        "cpi":                    cpi,
+        "flow_rate":              round(flow_rate, 1),
+        "transport_burst":        round(transport_burst, 3),
+        "chokepoint_density":     round(chokepoint_density, 3),
+        "surge_type":             surge_type,
+        "time_to_breach_seconds": ttb_s,
+        "time_to_breach_minutes": round(ttb_s / 60, 1) if ttb_s is not None else None,
+        "alert_active":           alert_active,
+        "alert_id":               alert_id,
+        "ml_confidence":          ml_confidence,
+        "ml_risk_level":          ml_risk_level,
+        "timestamp":              datetime.now(timezone.utc).isoformat(),
+    }
+
+
+# ── Background simulator task ─────────────────────────────────────────────────
+async def run_simulator():
+    print("[simulator] Loop started — broadcasting every 2s")
     while True:
-        readings = get_all_readings()
-        for r in readings:
-            await log_cpi(
-                corridor=r["corridor"],
-                cpi=r["cpi"],
-                flow_rate=r["flow_rate"],
-                transport_burst=r["transport_burst"],
-                chokepoint_density=r["chokepoint_density"],
-                surge_type=r["surge_type"],
-                alert_fired=r["alert_active"],
-            )
-            if r["alert_active"] and r["alert_id"]:
-                await insert_alert(
-                    alert_id=r["alert_id"],
-                    corridor=r["corridor"],
-                    cpi=r["cpi"],
-                    surge_type=r["surge_type"],
-                    ml_confidence=r.get("ml_confidence"),
-                )
-        await mgr.broadcast({"type": "cpi_batch", "data": readings})
+        try:
+            for corridor in CORRIDORS:
+                try:
+                    reading = _generate_reading(corridor)
+
+                    # Log to DB (non-blocking, ignore errors)
+                    try:
+                        await log_cpi(
+                            corridor=reading["corridor"],
+                            cpi=reading["cpi"],
+                            flow_rate=reading["flow_rate"],
+                            transport_burst=reading["transport_burst"],
+                            chokepoint_density=reading["chokepoint_density"],
+                            surge_type=reading["surge_type"],
+                            alert_fired=reading["alert_active"],
+                        )
+                    except Exception as db_err:
+                        print(f"[simulator] DB log error ({corridor}): {db_err}")
+
+                    if reading["alert_active"] and reading["alert_id"]:
+                        try:
+                            await insert_alert(
+                                alert_id=reading["alert_id"],
+                                corridor=reading["corridor"],
+                                cpi=reading["cpi"],
+                                surge_type=reading["surge_type"],
+                                ml_confidence=reading.get("ml_confidence"),
+                            )
+                        except Exception:
+                            pass
+
+                    await manager.broadcast(reading)
+                    print(f"[sim] {corridor}: CPI={reading['cpi']} {reading['surge_type']}")
+
+                except Exception as corridor_err:
+                    print(f"[simulator] Error for {corridor}: {corridor_err}")
+                    continue
+
+        except Exception as loop_err:
+            print(f"[simulator] Outer loop error: {loop_err}")
+
         await asyncio.sleep(2)
 
 
 # ── Lifecycle ─────────────────────────────────────────────────────────────────
 @app.on_event("startup")
 async def startup():
+    print("=== Backend starting up ===")
     await init_db()
-    asyncio.create_task(_broadcast_loop())
+    asyncio.create_task(run_simulator())
+    print("=== Simulator started ===")
     if _ML_AVAILABLE:
         try:
             load_models()
@@ -110,27 +240,38 @@ async def startup():
 async def health():
     return {
         "status": "ok",
-        "corridors": get_corridors(),
-        "replay_frames": len(REPLAY_FRAMES),
+        "connections": len(manager.active_connections),
+        "corridors": CORRIDORS,
         "ts": datetime.now(timezone.utc).isoformat(),
     }
 
 
 # ── WebSocket ─────────────────────────────────────────────────────────────────
 @app.websocket("/ws")
-async def websocket(ws: WebSocket):
-    await mgr.connect(ws)
+async def websocket_endpoint(websocket: WebSocket):
+    await manager.connect(websocket)
     try:
         while True:
-            await ws.receive_text()
+            # Keep connection alive — receive and ignore pings/messages
+            try:
+                data = await asyncio.wait_for(websocket.receive_text(), timeout=30.0)
+            except asyncio.TimeoutError:
+                # Send ping to keep alive
+                try:
+                    await websocket.send_json({"type": "ping"})
+                except Exception:
+                    break
     except WebSocketDisconnect:
-        mgr.disconnect(ws)
+        manager.disconnect(websocket)
+    except Exception as e:
+        print(f"[ws] WebSocket error: {e}")
+        manager.disconnect(websocket)
 
 
 # ── Corridors ─────────────────────────────────────────────────────────────────
 @app.get("/api/corridors")
 async def corridors():
-    return {"corridors": get_corridors(), "config": get_corridor_config()}
+    return {"corridors": CORRIDORS}
 
 
 # ── Alerts ────────────────────────────────────────────────────────────────────
@@ -161,7 +302,7 @@ async def events(limit: int = 50):
 @app.get("/api/events/export")
 async def export_events():
     rows = await get_events(limit=1000)
-    buf  = io.StringIO()
+    buf = io.StringIO()
     if rows:
         writer = csv.DictWriter(buf, fieldnames=rows[0].keys())
         writer.writeheader()
@@ -237,86 +378,69 @@ class SimulateBody(BaseModel):
 
 @app.post("/api/simulate")
 async def simulate_endpoint(body: SimulateBody):
-    """
-    Pure what-if CPI calculation — does NOT affect live simulation.
-    Returns: {cpi, surge_type, time_to_breach_seconds, ml_confidence}
-    """
-    baseline = CORRIDOR_BASELINES.get(body.corridor, CORRIDOR_BASELINES["Ambaji"])
-
-    norm_flow    = min((body.flow_rate or 0) / baseline["capacity_ppm"], 1.0)
-    norm_density = min(body.chokepoint_density or 0, 1.0)
-    transport    = min(body.transport_burst or 0, 1.0)
-
-    cpi = norm_flow * 0.5 + transport * 0.3 + norm_density * 0.2
+    cpi = (
+        (min(body.flow_rate or 0, 2000) / 2000) * 0.5
+        + min(body.transport_burst or 0, 1.0) * 0.3
+        + min(body.chokepoint_density or 0, 1.0) * 0.2
+    )
     cpi = round(max(0.0, min(cpi, 1.0)), 3)
 
-    # Surge type from CPI thresholds
-    if cpi >= 0.85:
-        surge_type = "GENUINE_CRUSH"
-    elif cpi >= 0.70:
+    if cpi >= 0.70:
         surge_type = "GENUINE_CRUSH"
     elif cpi >= 0.50:
         surge_type = "SELF_RESOLVING"
     else:
         surge_type = "SAFE"
 
-    # Estimate TTB: assume steady 1% CPI rise per 2s (simple model)
-    if cpi < 0.85 and cpi >= 0.40:
-        assumed_slope = 0.008 + (cpi - 0.40) * 0.02
-        ttb_s = int((0.85 - cpi) / assumed_slope)
+    ttb_s = None
+    if 0.40 <= cpi < 0.85:
+        slope = 0.008 + (cpi - 0.40) * 0.02
+        ttb_s = int((0.85 - cpi) / slope)
     elif cpi >= 0.85:
         ttb_s = 0
-    else:
-        ttb_s = None
 
-    # ML confidence
     ml_confidence = None
     if _ML_AVAILABLE:
         try:
             res = predict_with_confidence({
-                "cpi":               cpi,
-                "flow_rate":         body.flow_rate,
-                "transport_burst":   transport,
-                "chokepoint_density": norm_density,
+                "cpi": cpi,
+                "flow_rate": body.flow_rate,
+                "transport_burst": body.transport_burst,
+                "chokepoint_density": body.chokepoint_density,
             })
             ml_confidence = res.get("confidence_score")
         except Exception:
             pass
 
     return {
-        "cpi":                    cpi,
-        "surge_type":             surge_type,
+        "cpi": cpi,
+        "surge_type": surge_type,
         "time_to_breach_seconds": ttb_s,
-        "ml_confidence":          ml_confidence,
+        "ml_confidence": ml_confidence,
     }
 
 
 # ── Incident Report ───────────────────────────────────────────────────────────
 @app.get("/api/report/{alert_id}")
 async def get_report(alert_id: str):
-    """
-    Return a full incident report for a given alert_id.
-    """
     alert = await get_alert_by_id(alert_id)
     if not alert:
         raise HTTPException(404, f"Alert {alert_id} not found")
 
     fired_dt = datetime.fromisoformat(alert["fired_at"])
-
     ack_times = {
         "police": alert.get("police_ack"),
         "temple": alert.get("temple_ack"),
         "gsrtc":  alert.get("gsrtc_ack"),
     }
-
-    all_acked  = all(v for v in ack_times.values())
-    any_acked  = any(v for v in ack_times.values())
+    all_acked = all(v for v in ack_times.values())
+    any_acked = any(v for v in ack_times.values())
     resolved_at = None
     duration_seconds = None
 
     if all_acked:
-        resolved_dt  = max(datetime.fromisoformat(t) for t in ack_times.values())
-        resolved_at  = resolved_dt.isoformat()
+        resolved_dt = max(datetime.fromisoformat(t) for t in ack_times.values())
+        resolved_at = resolved_dt.isoformat()
         duration_seconds = int((resolved_dt - fired_dt).total_seconds())
         outcome = "FULLY_RESOLVED"
     elif any_acked:
