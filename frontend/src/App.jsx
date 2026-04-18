@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import axios from 'axios'
+import { api } from './utils/auth'
 
 import { useWebSocket } from './hooks/useWebSocket'
 import { useNotifications } from './hooks/useNotifications'
@@ -19,8 +19,6 @@ import AdminPanel from './components/AdminPanel'
 import PDFViewer from './components/PDFViewer'
 import Login from './pages/Login'
 
-const API = import.meta.env.VITE_API_URL || 'http://localhost:8000'
-
 const ROLE_COLORS = {
   police: '#3B82F6',
   gsrtc: '#F59E0B',
@@ -36,7 +34,38 @@ const ROLE_TABS = {
 }
 
 export default function App() {
-  const [auth, setAuth] = useState(null)
+  // ── Auth check ─────────────────────────────
+  const token = localStorage.getItem('ts11_token')
+  const role = localStorage.getItem('ts11_role')
+  const userRaw = localStorage.getItem('ts11_user')
+  
+  let user = null
+  try {
+    user = userRaw ? JSON.parse(userRaw) : null
+  } catch {
+    user = null
+  }
+
+  // Read agency from URL
+  const params = new URLSearchParams(window.location.search)
+  const agencyParam = params.get('agency')
+
+  // If no token → show Login page
+  if (!token || !role) {
+    return <Login />
+  }
+
+  // If agency param doesn't match stored role (and not admin)
+  // redirect to correct agency URL
+  if (agencyParam && agencyParam !== role && role !== 'admin') {
+    window.location.href = `/?agency=${role}`
+    return null
+  }
+
+  // Use role from localStorage (more reliable than URL param)
+  const activeRole = role
+  const activeAgency = agencyParam || role
+
   const [activeTab, setActiveTab] = useState('Dashboard')
   const [selectedCorridor, setSelectedCorridor] = useState('Ambaji')
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
@@ -44,40 +73,11 @@ export default function App() {
   const [pdfViewer, setPdfViewer] = useState(null)
 
   const { corridorData, corridorHistory, connectionStatus, lastUpdate, busData } = useWebSocket()
-  const { notifications, unreadCount, markRead, markAllRead } = useNotifications(corridorData, auth?.role)
-
-  // Check for existing auth on load
-  useEffect(() => {
-    const token = localStorage.getItem('auth_token')
-    const role = localStorage.getItem('user_role')
-    
-    if (token && role) {
-      // Verify token with backend
-      axios.get(`${API}/api/me`, {
-        headers: { Authorization: `Bearer ${token}` }
-      })
-      .then(response => {
-        setAuth({
-          token,
-          role: response.data.role,
-          name: response.data.name,
-          unit_id: response.data.unit_id,
-          display_name: response.data.display_name,
-          color: response.data.color,
-          permissions: response.data.permissions
-        })
-      })
-      .catch(() => {
-        // Token invalid, clear storage
-        localStorage.removeItem('auth_token')
-        localStorage.removeItem('user_role')
-      })
-    }
-  }, [])
+  const { notifications, unreadCount, markRead, markAllRead } = useNotifications(corridorData, activeRole)
 
   // Handle alert reply requirement
   useEffect(() => {
-    if (!auth || !corridorData) return
+    if (!user || !corridorData) return
 
     // Check for active alerts that need response
     Object.values(corridorData).forEach(corridor => {
@@ -91,7 +91,7 @@ export default function App() {
         })
       }
     })
-  }, [corridorData, auth, alertReplyModal, selectedCorridor])
+  }, [corridorData, user, alertReplyModal, selectedCorridor])
 
   // Handle PDF ready notifications
   useEffect(() => {
@@ -103,21 +103,16 @@ export default function App() {
     })
   }, [notifications, markRead])
 
-  const handleLogin = (authData) => {
-    setAuth(authData)
-    localStorage.setItem('auth_token', authData.token)
-    localStorage.setItem('user_role', authData.role)
-  }
-
   const handleLogout = () => {
-    if (auth?.token) {
-      axios.post(`${API}/api/logout`, { token: auth.token }).catch(() => {})
+    if (token) {
+      api.post('/api/logout', { token }).catch(() => {})
     }
-    localStorage.removeItem('auth_token')
-    localStorage.removeItem('user_role')
-    setAuth(null)
+    localStorage.removeItem('ts11_token')
+    localStorage.removeItem('ts11_role')
+    localStorage.removeItem('ts11_user')
     setAlertReplyModal(null)
     setPdfViewer(null)
+    window.location.href = '/'
   }
 
   const handleAlertReplied = (alertId) => {
@@ -142,13 +137,8 @@ export default function App() {
     }
   }
 
-  // Show login if not authenticated
-  if (!auth) {
-    return <Login onLogin={handleLogin} />
-  }
-
-  const userTabs = ROLE_TABS[auth.role] || ROLE_TABS.police
-  const accentColor = ROLE_COLORS[auth.role] || ROLE_COLORS.police
+  const userTabs = ROLE_TABS[activeRole] || ROLE_TABS.police
+  const accentColor = ROLE_COLORS[activeRole] || ROLE_COLORS.police
 
   return (
     <div style={{
@@ -218,7 +208,7 @@ export default function App() {
               textTransform: 'capitalize',
               border: `1px solid ${accentColor}40`
             }}>
-              {auth.role}
+              {activeRole}
             </div>
 
             {/* User Name */}
@@ -226,7 +216,7 @@ export default function App() {
               fontSize: '14px',
               color: '#94a3b8'
             }}>
-              {auth.name}
+              {user?.name || 'User'}
             </span>
 
             {/* Connection Status */}
@@ -461,7 +451,7 @@ export default function App() {
 
             {/* Agency Panel */}
             <AgencyPanel
-              agency={auth.role}
+              agency={activeRole}
               corridorData={corridorData}
               selectedCorridor={selectedCorridor}
             />
@@ -492,7 +482,7 @@ export default function App() {
           <HistoricalPanel corridor={selectedCorridor} />
         )}
 
-        {activeTab === 'Replay' && auth.role === 'admin' && (
+        {activeTab === 'Replay' && activeRole === 'admin' && (
           <ReplayMode />
         )}
 
@@ -525,11 +515,11 @@ export default function App() {
           <EventLog />
         )}
 
-        {activeTab === 'Admin' && auth.role === 'admin' && (
-          <AdminPanel token={auth.token} />
+        {activeTab === 'Admin' && activeRole === 'admin' && (
+          <AdminPanel token={token} />
         )}
 
-        {activeTab === 'Buses' && auth.role === 'gsrtc' && (
+        {activeTab === 'Buses' && activeRole === 'gsrtc' && (
           <div style={{
             background: '#1e293b',
             border: '1px solid #334155',
@@ -633,8 +623,8 @@ export default function App() {
       {alertReplyModal && (
         <AlertReplyModal
           alert={alertReplyModal}
-          agency={auth}
-          token={auth.token}
+          agency={user}
+          token={token}
           onClose={() => setAlertReplyModal(null)}
           onReplied={handleAlertReplied}
         />

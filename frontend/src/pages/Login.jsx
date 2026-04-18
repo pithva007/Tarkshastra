@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react'
-import axios from 'axios'
 
-const API = import.meta.env.VITE_API_URL || 'http://localhost:8000'
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
 
 const ROLES = [
   {
@@ -67,9 +66,10 @@ export default function Login() {
 
   useEffect(() => {
     // Fetch system health for active alerts count
-    axios.get(`${API}/health`)
-      .then(res => {
-        setSystemStats({ alerts: res.data.connections || 0 })
+    fetch(`${API_URL}/health`)
+      .then(res => res.json())
+      .then(data => {
+        setSystemStats({ alerts: data.connections || 0 })
       })
       .catch(() => {
         setSystemStats({ alerts: 0 })
@@ -79,39 +79,72 @@ export default function Login() {
   const handleRoleSelect = (role) => {
     setSelectedRole(role)
     setError('')
-    // Pre-fill demo credentials
-    const creds = role.credentials.split(' / ')
-    setUsername(creds[0])
-    setPassword(creds[1])
+    
+    // Prefill demo credentials on role select
+    const DEMO_CREDS = {
+      police:  { u: 'police_001',  p: 'police123'  },
+      gsrtc:   { u: 'gsrtc_001',   p: 'gsrtc123'   },
+      temple:  { u: 'temple_001',  p: 'temple123'  },
+      admin:   { u: 'admin_001',   p: 'admin123'   }
+    }
+    
+    const creds = DEMO_CREDS[role.id]
+    if (creds) {
+      setUsername(creds.u)
+      setPassword(creds.p)
+    }
   }
 
-  const handleSubmit = async (e) => {
+  const handleLogin = async (e) => {
     e.preventDefault()
-    if (!selectedRole || !username || !password) {
-      setError('Please select a role and enter credentials')
+    setError('')
+    
+    if (!username || !password) {
+      setError('Enter username and password')
       return
     }
 
     setLoading(true)
-    setError('')
 
     try {
-      const response = await axios.post(`${API}/api/login`, {
-        username,
-        password
+      const response = await fetch(`${API_URL}/api/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password })
       })
 
-      const { token, role } = response.data
-      
-      // Store auth data
-      localStorage.setItem('auth_token', token)
-      localStorage.setItem('user_role', role)
-      
-      // Redirect to dashboard
-      window.location.href = `/?agency=${role}&token=${token}`
+      const data = await response.json()
+
+      if (!response.ok) {
+        setError(data.detail || 'Invalid credentials')
+        setLoading(false)
+        return
+      }
+
+      // Save to localStorage
+      localStorage.setItem('ts11_token', data.token)
+      localStorage.setItem('ts11_role', data.role)
+      localStorage.setItem('ts11_user', JSON.stringify({
+        name: data.name,
+        role: data.role,
+        unit_id: data.unit_id,
+        display_name: data.display_name,
+        color: data.color || '#3B82F6',
+        permissions: data.permissions || []
+      }))
+
+      console.log('[LOGIN] Success:', data.role, data.name)
+      console.log('[LOGIN] Token saved:', data.token.slice(0,20) + '...')
+
+      // Hard redirect to dashboard
+      // Small delay so localStorage write completes
+      setTimeout(() => {
+        window.location.href = `/?agency=${data.role}`
+      }, 100)
+
     } catch (err) {
-      setError(err.response?.data?.detail || 'Login failed')
-    } finally {
+      console.error('[LOGIN] Error:', err)
+      setError('Connection failed. Is backend running?')
       setLoading(false)
     }
   }
@@ -303,7 +336,7 @@ export default function Login() {
 
           {/* Login Form */}
           {selectedRole && (
-            <form onSubmit={handleSubmit} style={{ marginBottom: '24px' }}>
+            <form onSubmit={handleLogin} style={{ marginBottom: '24px' }}>
               <div style={{ marginBottom: '16px' }}>
                 <label style={{
                   display: 'block',
@@ -380,19 +413,18 @@ export default function Login() {
 
               <button
                 type="submit"
-                disabled={loading}
+                disabled={loading || !selectedRole}
                 style={{
                   width: '100%',
-                  padding: '14px',
-                  background: loading ? '#64748b' : selectedRole.color,
-                  color: '#ffffff',
+                  padding: '12px',
+                  background: loading ? '#374151' : '#2563eb',
+                  color: 'white',
                   border: 'none',
                   borderRadius: '8px',
-                  fontSize: '16px',
+                  fontSize: '14px',
                   fontWeight: '600',
                   cursor: loading ? 'not-allowed' : 'pointer',
-                  transition: 'all 0.2s ease',
-                  opacity: loading ? 0.7 : 1
+                  marginTop: '12px'
                 }}
               >
                 {loading ? 'Signing in...' : 'Sign In'}
