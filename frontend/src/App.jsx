@@ -65,8 +65,8 @@ export default function App() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [pdfViewer, setPdfViewer] = useState(null)
 
-  const { corridorData, connectionStatus, busData } = useWebSocket()
-  const { notifications, unreadCount, markRead, markAllRead } = useNotifications(corridorData, activeRole)
+  const { corridorData, connectionStatus, busData, wsRef } = useWebSocket()
+  const { notifications, unreadCount, markRead, markAllRead, addNotification } = useNotifications(corridorData, activeRole)
 
   // Handle alert reply requirement
   useEffect(() => {
@@ -103,6 +103,45 @@ export default function App() {
 
     checkForAlerts()
   }, [corridorData, activeAlert])  // Only runs when corridorData changes
+
+  // Handle WebSocket messages for alert resolution, PDF ready, and call updates
+  useEffect(() => {
+    const handleWSMessage = (event) => {
+      const data = event.detail
+
+      if (data.type === 'alert_resolved') {
+        // Alert is officially resolved — update UI
+        setActiveAlert(prev => {
+          if (prev?.alert_id === data.alert_id) {
+            return null  // Clear active alert
+          }
+          return prev
+        })
+        setShowAlertModal(false)
+        console.log('[RESOLVED]', data.corridor, data.alert_id)
+      }
+
+      if (data.type === 'pdf_ready') {
+        // PDF notification is already handled by useNotifications hook
+        console.log('[PDF READY]', data.corridor, data.alert_id)
+      }
+
+      if (data.type === 'call_update') {
+        // Call update notification
+        const calledRoles = data.calls
+          .filter(c => c.status === 'calling')
+          .map(c => c.role)
+          .join(', ')
+        
+        if (calledRoles) {
+          console.log('[CALL UPDATE]', data.corridor, calledRoles)
+        }
+      }
+    }
+
+    window.addEventListener('ws_message', handleWSMessage)
+    return () => window.removeEventListener('ws_message', handleWSMessage)
+  }, [])
 
   // Handle PDF ready notifications
   useEffect(() => {
@@ -580,71 +619,99 @@ export default function App() {
               gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))',
               gap: '16px'
             }}>
-              {busData.map(bus => (
-                <div key={bus.id} style={{
-                  background: '#0f172a',
-                  border: `1px solid ${bus.held ? '#ef4444' : '#334155'}`,
-                  borderRadius: '12px',
-                  padding: '16px'
-                }}>
-                  <div style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    marginBottom: '12px'
+              {busData.map(bus => {
+                // Get corridor data for THIS bus's destination, not selected corridor
+                const busCorridorData = corridorData[bus.destination] || {
+                  cpi: 0,
+                  surge_type: 'SAFE',
+                  time_to_breach_minutes: 999,
+                  corridor_state: 'NORMAL'
+                }
+                
+                return (
+                  <div key={bus.id} style={{
+                    background: '#0f172a',
+                    border: `1px solid ${bus.held ? '#ef4444' : '#334155'}`,
+                    borderRadius: '12px',
+                    padding: '16px'
                   }}>
-                    <h3 style={{
-                      fontSize: '16px',
-                      fontWeight: '600',
-                      color: '#f1f5f9',
-                      margin: 0
+                    <div style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      marginBottom: '12px'
                     }}>
-                      {bus.id}
-                    </h3>
-                    {bus.held && (
-                      <span style={{
-                        padding: '4px 8px',
-                        background: '#ef444420',
-                        color: '#ef4444',
+                      <h3 style={{
+                        fontSize: '16px',
+                        fontWeight: '600',
+                        color: '#f1f5f9',
+                        margin: 0
+                      }}>
+                        {bus.id}
+                      </h3>
+                      {bus.held && (
+                        <span style={{
+                          padding: '4px 8px',
+                          background: '#ef444420',
+                          color: '#ef4444',
+                          borderRadius: '6px',
+                          fontSize: '12px',
+                          fontWeight: '600'
+                        }}>
+                          HELD
+                        </span>
+                      )}
+                    </div>
+                    
+                    <div style={{ fontSize: '14px', color: '#94a3b8', marginBottom: '8px' }}>
+                      Driver: {bus.driver}
+                    </div>
+                    <div style={{ fontSize: '14px', color: '#94a3b8', marginBottom: '8px' }}>
+                      Route: {bus.route}
+                    </div>
+                    <div style={{ fontSize: '14px', color: '#94a3b8', marginBottom: '8px' }}>
+                      Destination: {bus.destination} (CPI: {busCorridorData.cpi.toFixed(3)})
+                    </div>
+                    <div style={{ fontSize: '14px', color: '#94a3b8', marginBottom: '8px' }}>
+                      Passengers: {bus.passengers}/{bus.capacity}
+                    </div>
+                    <div style={{ fontSize: '14px', color: '#94a3b8', marginBottom: '8px' }}>
+                      ETA: {bus.eta_minutes} min ({bus.distance_km} km)
+                    </div>
+                    <div style={{ fontSize: '14px', color: '#94a3b8', marginBottom: '8px' }}>
+                      Speed: {bus.speed_kmh} km/h
+                    </div>
+                    
+                    {/* Show crush risk for this bus's destination */}
+                    {busCorridorData.cpi >= 0.70 && busCorridorData.time_to_breach_minutes < 999 && (
+                      <div style={{
+                        marginTop: '12px',
+                        padding: '8px',
+                        background: busCorridorData.cpi >= 0.85 ? '#ef444420' : '#f59e0b20',
+                        color: busCorridorData.cpi >= 0.85 ? '#ef4444' : '#f59e0b',
                         borderRadius: '6px',
                         fontSize: '12px',
                         fontWeight: '600'
                       }}>
-                        HELD
-                      </span>
+                        ⚠ Crush risk in {Math.round(busCorridorData.time_to_breach_minutes)} min at {bus.destination}
+                      </div>
+                    )}
+                    
+                    {bus.alert_message && (
+                      <div style={{
+                        marginTop: '12px',
+                        padding: '8px',
+                        background: `${bus.alert_status === 'hold' ? '#ef4444' : '#f59e0b'}20`,
+                        color: bus.alert_status === 'hold' ? '#ef4444' : '#f59e0b',
+                        borderRadius: '6px',
+                        fontSize: '12px'
+                      }}>
+                        {bus.alert_message}
+                      </div>
                     )}
                   </div>
-                  
-                  <div style={{ fontSize: '14px', color: '#94a3b8', marginBottom: '8px' }}>
-                    Driver: {bus.driver}
-                  </div>
-                  <div style={{ fontSize: '14px', color: '#94a3b8', marginBottom: '8px' }}>
-                    Route: {bus.route}
-                  </div>
-                  <div style={{ fontSize: '14px', color: '#94a3b8', marginBottom: '8px' }}>
-                    Passengers: {bus.passengers}/{bus.capacity}
-                  </div>
-                  <div style={{ fontSize: '14px', color: '#94a3b8', marginBottom: '8px' }}>
-                    ETA: {bus.eta_minutes} min ({bus.distance_km} km)
-                  </div>
-                  <div style={{ fontSize: '14px', color: '#94a3b8' }}>
-                    Speed: {bus.speed_kmh} km/h
-                  </div>
-                  
-                  {bus.alert_message && (
-                    <div style={{
-                      marginTop: '12px',
-                      padding: '8px',
-                      background: `${bus.alert_status === 'hold' ? '#ef4444' : '#f59e0b'}20`,
-                      color: bus.alert_status === 'hold' ? '#ef4444' : '#f59e0b',
-                      borderRadius: '6px',
-                      fontSize: '12px'
-                    }}>
-                      {bus.alert_message}
-                    </div>
-                  )}
-                </div>
-              ))}
+                )
+              })}
             </div>
           </div>
         )}

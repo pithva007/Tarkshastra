@@ -77,8 +77,8 @@ export default function NotificationBell({
             ) : (
               notifications.slice(0, 10).map((n) => (
                 <div key={n.id}>
-                  {/* PDF Ready Notification */}
-                  {n.type === 'pdf_ready' && (
+                  {/* PDF Ready or Call Update Notification */}
+                  {(n.type === 'pdf_ready' || n.type === 'call_update') && n.pdf_url && (
                     <div style={{
                       background: '#1e293b',
                       border: '1px solid #ef4444',
@@ -93,7 +93,7 @@ export default function NotificationBell({
                         fontSize: 13,
                         marginBottom: 6
                       }}>
-                        📄 Incident Report Ready
+                        {n.type === 'pdf_ready' ? '📄 Incident Report Ready' : '📞 Calls Made'}
                       </div>
                       <div style={{
                         color: '#94a3b8',
@@ -103,26 +103,72 @@ export default function NotificationBell({
                         {n.corridor} — {n.message}
                       </div>
                       <button
-                        onClick={() => window.open(`${API_URL}${n.pdf_url}`, '_blank')}
+                        onClick={() => {
+                          const base = import.meta.env.VITE_API_URL || 'http://localhost:8000'
+                          window.open(`${base}${n.pdf_url}`, '_blank')
+                          onMarkRead?.(n.id)
+                        }}
                         style={{
-                          background: '#dc2626',
-                          color: 'white',
-                          border: 'none',
-                          borderRadius: 6,
-                          padding: '6px 14px',
-                          fontSize: 12,
-                          fontWeight: 600,
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '6px',
+                          background: '#1e3a5f',
+                          color: '#60a5fa',
+                          border: '1px solid #3B82F6',
+                          borderRadius: '6px',
+                          padding: '5px 10px',
+                          fontSize: '11px',
+                          fontWeight: '600',
                           cursor: 'pointer',
-                          width: '100%'
+                          width: '100%',
+                          justifyContent: 'center'
                         }}
                       >
-                        Open PDF Report →
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                          <path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"/>
+                        </svg>
+                        Open Incident Report PDF
                       </button>
+                    </div>
+                  )}
+
+                  {/* Alert Resolved Notification */}
+                  {n.type === 'alert_resolved' && (
+                    <div style={{
+                      background: '#1e293b',
+                      border: '1px solid #22c55e',
+                      borderRadius: 8,
+                      padding: '12px',
+                      margin: '8px',
+                      marginBottom: 8
+                    }}>
+                      <div style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px',
+                        color: '#22c55e',
+                        fontWeight: 600,
+                        fontSize: 13,
+                        marginBottom: 6
+                      }}>
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                          <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
+                          <polyline points="22 4 12 14.01 9 11.01"/>
+                        </svg>
+                        Alert Resolved
+                      </div>
+                      <div style={{
+                        color: '#94a3b8',
+                        fontSize: 12
+                      }}>
+                        {n.corridor} — {n.message}
+                      </div>
                     </div>
                   )}
                   
                   {/* Regular Notification */}
-                  {n.type !== 'pdf_ready' && (
+                  {n.type !== 'pdf_ready' && n.type !== 'call_update' && n.type !== 'alert_resolved' && (
                     <button
                       onClick={() => { onMarkRead?.(n.id); }}
                       className={`w-full text-left px-4 py-3 border-b border-gray-800 hover:bg-gray-800 transition-colors ${

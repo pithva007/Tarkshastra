@@ -137,6 +137,14 @@ manager = ConnectionManager()
 # Prevents duplicate calls for same alert
 called_alert_ids: set = set()
 
+# Track active alerts per corridor
+# Format: { corridor_name: alert_id }
+# When corridor has active alert, don't create new one
+# until current alert is resolved or 15 min passes
+active_corridor_alerts: dict = {}
+alert_resolution_time: dict = {}
+ALERT_COOLDOWN_MINUTES = 15
+
 # ── Import new simulator ─────────────────────────────────────────────────────
 from simulator import get_simulator
 from bus_simulator import BusSimulator
@@ -155,15 +163,31 @@ bus_simulator = BusSimulator()
 async def handle_new_alert(data: dict):
     """Called when corridor transitions to SURGE alert."""
     alert_id = data["alert_id"]
+    corridor = data["corridor"]
     
-    # Prevent duplicate handling
-    if alert_id in called_alert_ids:
+    # Check if this corridor already has active alert
+    existing = active_corridor_alerts.get(corridor)
+    if existing:
+        # Same corridor already alerted — skip
+        print(f"[ALERT SKIP] {corridor} already has active alert: {existing}")
         return
+    
+    # Check cooldown — was this corridor alerted recently?
+    last_alert_time = alert_resolution_time.get(corridor, 0)
+    minutes_since = (datetime.now(timezone.utc).timestamp() - last_alert_time) / 60
+    if minutes_since < ALERT_COOLDOWN_MINUTES:
+        remaining = ALERT_COOLDOWN_MINUTES - minutes_since
+        print(f"[ALERT SKIP] {corridor} on cooldown ({remaining:.1f} min remaining)")
+        return
+    
+    # New alert for this corridor
+    active_corridor_alerts[corridor] = alert_id
     called_alert_ids.add(alert_id)
+    print(f"[ALERT NEW] {corridor}: {alert_id}")
     
     # Generate PDF + make calls in background
     asyncio.create_task(trigger_calls_and_log(
-        corridor=data["corridor"],
+        corridor=corridor,
         cpi=data["cpi"],
         ttb_minutes=data["time_to_breach_minutes"],
         surge_type=data["surge_type"],
@@ -292,7 +316,9 @@ async def submit_alert_reply(data: dict):
     if not session:
         raise HTTPException(status_code=401, detail="Not authenticated")
     
-    if not has_permission(token, "reply_alert"):
+    # Check permission using the role from the verified session
+    role = session.get("role", "")
+    if "reply_alert" not in PERMISSIONS.get(role, []):
         raise HTTPException(status_code=403,
                           detail="Permission denied")
     
@@ -313,6 +339,29 @@ async def submit_alert_reply(data: dict):
             replied_at=replied_at,
             ack_time_seconds=data.get("ack_time_seconds", 0)
         )
+        
+        # Check if all 3 agencies have replied
+        cursor = await db.execute("""
+            SELECT COUNT(DISTINCT role) FROM alert_replies 
+            WHERE alert_id = ? AND role IN ('police', 'temple', 'gsrtc')
+        """, (data.get("alert_id"),))
+        distinct_roles = (await cursor.fetchone())[0]
+        
+        if distinct_roles >= 3:
+            # All agencies replied — auto resolve
+            print(f"[AUTO RESOLVE] All agencies replied for {data.get('alert_id')}")
+            corridor_to_resolve = data.get("corridor")
+            if corridor_to_resolve in active_corridor_alerts:
+                del active_corridor_alerts[corridor_to_resolve]
+                alert_resolution_time[corridor_to_resolve] = datetime.now(timezone.utc).timestamp()
+                
+                await manager.broadcast({
+                    "type": "alert_resolved",
+                    "alert_id": data.get("alert_id"),
+                    "corridor": data.get("corridor"),
+                    "resolved_by": "all_agencies_replied",
+                    "resolved_at": datetime.utcnow().isoformat()
+                })
     
     # Broadcast reply to all dashboards
     await manager.broadcast({
@@ -337,6 +386,56 @@ async def submit_alert_reply(data: dict):
 async def get_replies_for_alert(alert_id: str):
     async with aiosqlite.connect("stampede.db") as db:
         return await get_alert_replies(db, alert_id)
+
+
+@app.post("/api/alert/resolve/{alert_id}")
+async def resolve_alert(alert_id: str):
+    """Mark alert as resolved.
+    Removes from active_corridor_alerts.
+    Sets cooldown for that corridor.
+    Called automatically when all 3 agencies reply."""
+    # Find which corridor this alert belongs to
+    corridor = None
+    for c, aid in active_corridor_alerts.items():
+        if aid == alert_id:
+            corridor = c
+            break
+    
+    if corridor:
+        del active_corridor_alerts[corridor]
+        alert_resolution_time[corridor] = datetime.now(timezone.utc).timestamp()
+        print(f"[ALERT RESOLVED] {corridor}: {alert_id}")
+        
+        await manager.broadcast({
+            "type": "alert_resolved",
+            "alert_id": alert_id,
+            "corridor": corridor,
+            "resolved_at": datetime.utcnow().isoformat()
+        })
+        
+        return {
+            "status": "resolved",
+            "corridor": corridor,
+            "alert_id": alert_id,
+            "cooldown_minutes": ALERT_COOLDOWN_MINUTES
+        }
+    
+    return {"status": "not_found", "alert_id": alert_id}
+
+
+@app.get("/api/alerts/active")
+async def get_active_alerts():
+    """Returns currently active unresolved alerts."""
+    current_time = datetime.now(timezone.utc).timestamp()
+    return {
+        "active": active_corridor_alerts,
+        "count": len(active_corridor_alerts),
+        "cooldowns": {
+            corridor: round(ALERT_COOLDOWN_MINUTES - (current_time - t) / 60, 1)
+            for corridor, t in alert_resolution_time.items()
+            if (current_time - t) / 60 < ALERT_COOLDOWN_MINUTES
+        }
+    }
 
 # ── Admin endpoints ──────────────────────────
 @app.get("/api/admin/sessions")
@@ -822,8 +921,9 @@ async def trigger_calls_and_log(
 ):
     """Background task: generate PDF, trigger calls and log results to DB + broadcast."""
     
-    # Generate PDF report first
+    # STEP 1 — Generate PDF first before making calls
     pdf_path = None
+    pdf_url = None
     try:
         loop = asyncio.get_event_loop()
         pdf_path = await loop.run_in_executor(
@@ -840,20 +940,22 @@ async def trigger_calls_and_log(
                 ml_confidence=ml_confidence
             )
         )
-        print(f"[PDF] Ready: {pdf_path}")
+        pdf_url = f"/api/report/{alert_id}"
+        print(f"[PDF] Generated: {pdf_path}")
     except Exception as e:
         print(f"[PDF ERROR] {e}")
 
-    # Broadcast PDF ready notification
+    # STEP 2 — Broadcast PDF ready to dashboard
     await manager.broadcast({
         "type": "pdf_ready",
         "alert_id": alert_id,
         "corridor": corridor,
-        "pdf_url": f"/api/report/{alert_id}",
-        "message": f"Incident report ready for {corridor}. Tap to open."
+        "pdf_url": pdf_url,
+        "message": f"Incident report ready for {corridor}. Tap notification to open.",
+        "timestamp": datetime.utcnow().isoformat()
     })
 
-    # Then make calls (mentions PDF in message)
+    # STEP 3 — Make calls (Twilio handles PDF mention in the voice message via call_service.py)
     results = trigger_corridor_calls(
         corridor=corridor,
         cpi=cpi,
@@ -862,6 +964,7 @@ async def trigger_calls_and_log(
         alert_id=alert_id,
     )
 
+    # STEP 4 — Log all call results
     async with aiosqlite.connect("stampede.db") as db:
         for r in results:
             await log_call(
@@ -877,15 +980,16 @@ async def trigger_calls_and_log(
                 surge_type=surge_type,
             )
 
-    # Broadcast call status to all connected dashboards
+    # STEP 5 — Broadcast call results with PDF url
     await manager.broadcast({
-        "type":      "call_update",
-        "alert_id":  alert_id,
-        "corridor":  corridor,
-        "calls":     results,
+        "type": "call_update",
+        "alert_id": alert_id,
+        "corridor": corridor,
+        "calls": results,
+        "pdf_url": pdf_url,
         "timestamp": datetime.now(timezone.utc).isoformat(),
     })
-    print(f"[CALLS DONE] {len(results)} calls processed for {corridor}")
+    print(f"[TRIGGER DONE] {corridor}: {len(results)} calls, PDF: {pdf_url}")
 
 
 # ── Call alert endpoints ──────────────────────────────────────────────────────
