@@ -4,6 +4,7 @@ TS-11 Stampede Window Predictor — FastAPI backend
 Start: uvicorn main:app --host 0.0.0.0 --port $PORT
 """
 import asyncio
+import base64
 import csv
 import io
 import math
@@ -19,8 +20,14 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 import uvicorn
 
-from database import init_db, insert_alert, ack_alert, get_alerts, log_cpi, get_events, get_alert_by_id
+from database import (
+    init_db, insert_alert, ack_alert, get_alerts, log_cpi, get_events,
+    get_alert_by_id, insert_notification, get_notifications,
+    get_historical_incidents,
+)
 from replay_data import REPLAY_FRAMES
+from bus_simulator import get_bus_update_message, update_destination_cpi
+from historical import get_historical_for_corridor, get_seasonal_prediction
 
 # ── ML predictor (optional — graceful if models not yet trained) ──────────────
 try:
@@ -30,7 +37,7 @@ except ImportError:
     _ML_AVAILABLE = False
 
 # ── App ───────────────────────────────────────────────────────────────────────
-app = FastAPI(title="TS-11 Stampede Predictor", version="2.2.0")
+app = FastAPI(title="TS-11 Stampede Predictor", version="3.0.0")
 
 app.add_middleware(
     CORSMiddleware,
@@ -39,6 +46,55 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# ── Demo users ────────────────────────────────────────────────────────────────
+DEMO_USERS = {
+    "driver_001": {
+        "password": "driver123",
+        "role": "driver",
+        "name": "Ramesh Patel",
+        "unit_id": "GJ-01-BUS-042",
+        "route": "Ahmedabad → Ambaji",
+    },
+    "police_001": {
+        "password": "police123",
+        "role": "police",
+        "name": "Inspector Mehta",
+        "unit_id": "Ambaji PS",
+        "station": "Ambaji Police Station",
+    },
+    "temple_001": {
+        "password": "temple123",
+        "role": "temple",
+        "name": "Trustee Sharma",
+        "unit_id": "Ambaji Temple",
+        "premises": "Main Sanctum Area",
+    },
+    "gsrtc_001": {
+        "password": "gsrtc123",
+        "role": "gsrtc",
+        "name": "Controller Joshi",
+        "unit_id": "GSRTC Depot 4",
+        "zone": "North Corridor",
+    },
+}
+
+ROLE_REDIRECT = {
+    "driver": "/?agency=driver",
+    "police": "/?agency=police",
+    "temple": "/?agency=temple",
+    "gsrtc":  "/?agency=gsrtc",
+}
+
+# Active sessions: token → { role, unit_id, name, username }
+_active_sessions: Dict[str, dict] = {}
+
+
+def _make_token(role: str, unit_id: str) -> str:
+    ts = datetime.now(timezone.utc).strftime("%Y%m%d%H%M%S")
+    raw = f"{role}:{unit_id}:{ts}"
+    return base64.b64encode(raw.encode()).decode()
+
 
 # ── WebSocket connection manager ──────────────────────────────────────────────
 class ConnectionManager:
@@ -72,7 +128,6 @@ manager = ConnectionManager()
 # ── Corridor simulator state ──────────────────────────────────────────────────
 CORRIDORS = ["Ambaji", "Dwarka", "Somnath", "Pavagadh"]
 
-# Phase offsets so each corridor is independent
 _PHASE_OFFSETS = {
     "Ambaji":   0.0,
     "Dwarka":   math.pi * 0.5,
@@ -83,42 +138,31 @@ _PHASE_OFFSETS = {
 _sim_step: Dict[str, int] = {c: 0 for c in CORRIDORS}
 _active_alerts: Dict[str, Optional[str]] = {c: None for c in CORRIDORS}
 _consecutive_high: Dict[str, int] = {c: 0 for c in CORRIDORS}
+_bus_tick = 0
 
 
 def _generate_reading(corridor: str) -> dict:
-    """Generate a realistic, non-zero CPI reading for a corridor."""
     step = _sim_step[corridor]
     _sim_step[corridor] += 1
 
     phase_offset = _PHASE_OFFSETS[corridor]
-    # Sine wave: period ~300 steps (10 min at 2s interval) — gradual rise and fall
-    sine_val = math.sin((step * 0.021) + phase_offset)  # -1 to 1
-
-    # Map sine to a realistic range: 0.3 to 0.85
-    base_cpi = 0.575 + sine_val * 0.275  # centre 0.575, amplitude 0.275
-
-    # Add small random noise
+    sine_val = math.sin((step * 0.021) + phase_offset)
+    base_cpi = 0.575 + sine_val * 0.275
     noise = random.uniform(-0.04, 0.04)
     base_cpi = max(0.25, min(0.95, base_cpi + noise))
 
-    # Derive component values that produce this CPI
-    # CPI = (flow_rate/2000)*0.5 + transport_burst*0.3 + chokepoint_density*0.2
-    # Work backwards from CPI to get plausible components
     flow_rate = random.uniform(800, 1800)
     transport_burst = random.uniform(0.2, 0.8)
     chokepoint_density = random.uniform(0.3, 0.9)
 
-    # Recalculate CPI from components (keeps formula consistent)
     cpi = (flow_rate / 2000) * 0.5 + transport_burst * 0.3 + chokepoint_density * 0.2
     cpi = round(max(0.25, min(0.95, cpi)), 3)
 
-    # Track consecutive high readings
     if cpi > 0.70:
         _consecutive_high[corridor] += 1
     else:
         _consecutive_high[corridor] = 0
 
-    # Classify surge type
     if _consecutive_high[corridor] >= 3 and cpi > 0.70:
         surge_type = "GENUINE_CRUSH"
     elif cpi >= 0.55:
@@ -126,7 +170,6 @@ def _generate_reading(corridor: str) -> dict:
     else:
         surge_type = "SAFE"
 
-    # Alert management
     alert_active = surge_type == "GENUINE_CRUSH"
     if alert_active:
         if _active_alerts[corridor] is None:
@@ -137,7 +180,6 @@ def _generate_reading(corridor: str) -> dict:
 
     alert_id = _active_alerts[corridor]
 
-    # Time to breach
     if cpi < 0.85 and cpi >= 0.40:
         slope = 0.008 + (cpi - 0.40) * 0.02
         ttb_s = int((0.85 - cpi) / slope)
@@ -146,7 +188,6 @@ def _generate_reading(corridor: str) -> dict:
     else:
         ttb_s = None
 
-    # ML confidence (deterministic from CPI)
     ml_confidence = min(99, max(50, int(50 + cpi * 50)))
     ml_risk_level = (
         "CRITICAL" if cpi >= 0.85 else
@@ -154,6 +195,9 @@ def _generate_reading(corridor: str) -> dict:
         "MEDIUM"   if cpi >= 0.50 else
         "LOW"
     )
+
+    # Keep bus simulator in sync with corridor CPI
+    update_destination_cpi(corridor, cpi)
 
     return {
         "type":                   "cpi_update",
@@ -175,6 +219,7 @@ def _generate_reading(corridor: str) -> dict:
 
 # ── Background simulator task ─────────────────────────────────────────────────
 async def run_simulator():
+    global _bus_tick
     print("[simulator] Loop started — broadcasting every 2s")
     while True:
         try:
@@ -182,7 +227,6 @@ async def run_simulator():
                 try:
                     reading = _generate_reading(corridor)
 
-                    # Log to DB (non-blocking, ignore errors)
                     try:
                         await log_cpi(
                             corridor=reading["corridor"],
@@ -214,6 +258,15 @@ async def run_simulator():
                 except Exception as corridor_err:
                     print(f"[simulator] Error for {corridor}: {corridor_err}")
                     continue
+
+            # Broadcast bus positions every 5 seconds (every 2-3 CPI cycles)
+            _bus_tick += 1
+            if _bus_tick % 3 == 0:
+                try:
+                    bus_msg = get_bus_update_message(_bus_tick)
+                    await manager.broadcast(bus_msg)
+                except Exception as bus_err:
+                    print(f"[simulator] Bus update error: {bus_err}")
 
         except Exception as loop_err:
             print(f"[simulator] Outer loop error: {loop_err}")
@@ -252,11 +305,9 @@ async def websocket_endpoint(websocket: WebSocket):
     await manager.connect(websocket)
     try:
         while True:
-            # Keep connection alive — receive and ignore pings/messages
             try:
                 data = await asyncio.wait_for(websocket.receive_text(), timeout=30.0)
             except asyncio.TimeoutError:
-                # Send ping to keep alive
                 try:
                     await websocket.send_json({"type": "ping"})
                 except Exception:
@@ -266,6 +317,51 @@ async def websocket_endpoint(websocket: WebSocket):
     except Exception as e:
         print(f"[ws] WebSocket error: {e}")
         manager.disconnect(websocket)
+
+
+# ── Auth ──────────────────────────────────────────────────────────────────────
+class LoginBody(BaseModel):
+    role: str
+    username: str
+    password: str
+    unit_id: Optional[str] = None
+
+
+@app.post("/api/login")
+async def login(body: LoginBody):
+    user = DEMO_USERS.get(body.username)
+    if not user:
+        raise HTTPException(401, "Invalid username or password")
+    if user["password"] != body.password:
+        raise HTTPException(401, "Invalid username or password")
+    if user["role"] != body.role:
+        raise HTTPException(401, f"Username does not match role '{body.role}'")
+
+    token = _make_token(user["role"], user["unit_id"])
+    _active_sessions[token] = {
+        "role":     user["role"],
+        "unit_id":  user["unit_id"],
+        "name":     user["name"],
+        "username": body.username,
+    }
+
+    redirect_url = ROLE_REDIRECT.get(user["role"], "/") + f"&token={token}"
+
+    return {
+        "token":        token,
+        "role":         user["role"],
+        "unit_id":      user["unit_id"],
+        "name":         user["name"],
+        "redirect_url": redirect_url,
+    }
+
+
+@app.get("/api/me")
+async def me(token: str):
+    session = _active_sessions.get(token)
+    if not session:
+        raise HTTPException(401, "Invalid or expired token")
+    return session
 
 
 # ── Corridors ─────────────────────────────────────────────────────────────────
@@ -462,6 +558,72 @@ async def get_report(alert_id: str):
         "resolved_at":      resolved_at,
         "outcome":          outcome,
     }
+
+
+# ── Notifications ─────────────────────────────────────────────────────────────
+class NotifyBody(BaseModel):
+    corridor: str
+    alert_id: str
+    cpi: float
+    surge_type: str
+    message: str
+
+
+ROLE_MESSAGES = {
+    "driver": lambda b: (
+        f"⚠ ALERT: {b.corridor} corridor CPI {b.cpi:.2f}. "
+        f"Hold at checkpoint — do NOT proceed to temple."
+    ),
+    "police": lambda b: (
+        f"🚨 URGENT: Crush risk at {b.corridor}. "
+        f"Deploy to Choke Point B immediately. Alert ID: {b.alert_id}"
+    ),
+    "temple": lambda b: (
+        f"🛕 ACTION: Activate darshan hold NOW. "
+        f"CPI: {b.cpi:.2f} — {b.surge_type}. Redirect pilgrims to Queue C."
+    ),
+    "gsrtc": lambda b: (
+        f"🚌 HOLD BUSES: {b.corridor} at capacity. "
+        f"Hold all vehicles at 3km checkpoint."
+    ),
+}
+
+
+@app.post("/api/notify")
+async def notify(body: NotifyBody):
+    inserted = []
+    for role, msg_fn in ROLE_MESSAGES.items():
+        msg = msg_fn(body)
+        nid = await insert_notification(
+            alert_id=body.alert_id,
+            role=role,
+            unit_id="broadcast",
+            message=msg,
+        )
+        inserted.append({"role": role, "id": nid})
+    return {"status": "sent", "notifications": inserted}
+
+
+@app.get("/api/notifications")
+async def get_notifs(role: Optional[str] = None, limit: int = 20):
+    rows = await get_notifications(role=role, limit=limit)
+    return {"notifications": rows}
+
+
+# ── Historical ────────────────────────────────────────────────────────────────
+@app.get("/api/historical/{corridor}")
+async def historical(corridor: str):
+    rows = await get_historical_incidents(corridor)
+    if not rows:
+        # Fall back to in-memory data
+        rows = get_historical_for_corridor(corridor)
+    return {"corridor": corridor, "incidents": rows}
+
+
+@app.get("/api/prediction/seasonal/{corridor}")
+async def seasonal_prediction(corridor: str, hour: Optional[int] = None):
+    prediction = get_seasonal_prediction(corridor, current_hour=hour)
+    return prediction
 
 
 # ── Entry point ───────────────────────────────────────────────────────────────

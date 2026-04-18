@@ -10,8 +10,10 @@ const MAX_HISTORY = 60
  * Returns:
  *   corridorData       — { Ambaji: {...}, Dwarka: {...}, ... } latest reading per corridor
  *   corridorHistory    — { Ambaji: [{cpi, t}, ...], ... } last 60 readings per corridor
+ *   busData            — array of live bus position objects from bus_update messages
  *   connectionStatus   — 'connecting' | 'connected' | 'disconnected'
  *   lastUpdate         — Date of last received message
+ *   retryCount         — number of reconnection attempts
  */
 export function useWebSocket() {
   const wsRef         = useRef(null)
@@ -24,6 +26,7 @@ export function useWebSocket() {
   const [corridorHistory, setCorridorHistory] = useState(
     () => Object.fromEntries(CORRIDORS.map((c) => [c, []]))
   )
+  const [busData,          setBusData]          = useState([])
   const [connectionStatus, setConnectionStatus] = useState('connecting')
   const [lastUpdate,       setLastUpdate]        = useState(null)
 
@@ -56,27 +59,26 @@ export function useWebSocket() {
       try {
         parsed = JSON.parse(data)
       } catch {
-        return // ignore non-JSON
+        return
       }
 
-      // Silently ignore ping frames
       if (parsed.type === 'ping') return
 
-      // Handle single cpi_update
       if (parsed.type === 'cpi_update' && parsed.corridor) {
-        console.log('Received:', parsed.corridor, parsed.cpi)
         applyReading(parsed)
         setLastUpdate(new Date())
         return
       }
 
-      // Handle batch (legacy support)
+      if (parsed.type === 'bus_update' && Array.isArray(parsed.buses)) {
+        setBusData(parsed.buses)
+        setLastUpdate(new Date())
+        return
+      }
+
       if (parsed.type === 'cpi_batch' && Array.isArray(parsed.data)) {
         parsed.data.forEach((r) => {
-          if (r && r.corridor) {
-            console.log('Received:', r.corridor, r.cpi)
-            applyReading(r)
-          }
+          if (r && r.corridor) applyReading(r)
         })
         setLastUpdate(new Date())
       }
@@ -121,11 +123,18 @@ export function useWebSocket() {
       unmounted.current = true
       clearTimeout(retryTimer.current)
       if (wsRef.current) {
-        wsRef.current.onclose = null // prevent reconnect on intentional close
+        wsRef.current.onclose = null
         wsRef.current.close()
       }
     }
   }, [connect])
 
-  return { corridorData, corridorHistory, connectionStatus, lastUpdate, retryCount: retryCount.current }
+  return {
+    corridorData,
+    corridorHistory,
+    busData,
+    connectionStatus,
+    lastUpdate,
+    retryCount: retryCount.current,
+  }
 }

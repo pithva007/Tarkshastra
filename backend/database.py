@@ -2,8 +2,10 @@
 SQLite schema and async helpers for TS-11 Stampede Predictor.
 
 Tables:
-  alerts  — one row per fired alert, tracks 3-agency ack times
-  cpi_log — rolling 10-minute CPI readings (pruned automatically)
+  alerts               — one row per fired alert, tracks 3-agency ack times
+  cpi_log              — rolling 10-minute CPI readings (pruned automatically)
+  notifications        — push notifications per role/unit
+  historical_incidents — seeded historical Navratri incident data
 """
 import aiosqlite
 from datetime import datetime, timezone
@@ -40,12 +42,72 @@ async def init_db():
                 logged_at       TEXT NOT NULL
             )
         """)
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS notifications (
+                id        INTEGER PRIMARY KEY AUTOINCREMENT,
+                alert_id  TEXT,
+                role      TEXT,
+                unit_id   TEXT,
+                message   TEXT,
+                sent_at   TEXT,
+                read_at   TEXT
+            )
+        """)
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS historical_incidents (
+                id                      INTEGER PRIMARY KEY AUTOINCREMENT,
+                year                    INTEGER,
+                event                   TEXT,
+                corridor                TEXT,
+                date_label              TEXT,
+                peak_time               TEXT,
+                peak_cpi                REAL,
+                surge_type              TEXT,
+                incident                TEXT,
+                action_taken            TEXT,
+                pilgrims_affected       INTEGER,
+                buses_held              INTEGER,
+                resolution_time_minutes INTEGER
+            )
+        """)
+
         # Migration: add ml_confidence column if it doesn't exist yet
         try:
             await db.execute("ALTER TABLE alerts ADD COLUMN ml_confidence REAL DEFAULT NULL")
         except Exception:
             pass
+
         await db.commit()
+
+    # Seed historical incidents (idempotent)
+    await _seed_historical()
+
+
+async def _seed_historical():
+    """Seed historical_incidents from HISTORICAL_DATA if table is empty."""
+    from historical import HISTORICAL_DATA
+    async with aiosqlite.connect(DB_PATH) as db:
+        async with db.execute("SELECT COUNT(*) FROM historical_incidents") as cur:
+            row = await cur.fetchone()
+            if row and row[0] > 0:
+                return  # already seeded
+
+        for inc in HISTORICAL_DATA:
+            await db.execute(
+                """INSERT INTO historical_incidents
+                   (year, event, corridor, date_label, peak_time, peak_cpi,
+                    surge_type, incident, action_taken, pilgrims_affected,
+                    buses_held, resolution_time_minutes)
+                   VALUES (?,?,?,?,?,?,?,?,?,?,?,?)""",
+                (
+                    inc["year"], inc["event"], inc["corridor"], inc["date_label"],
+                    inc["peak_time"], inc["peak_cpi"], inc["surge_type"],
+                    inc["incident"], inc["action_taken"], inc["pilgrims_affected"],
+                    inc["buses_held"], inc["resolution_time_minutes"],
+                ),
+            )
+        await db.commit()
+        print("[db] Historical incidents seeded.")
 
 
 # ── Alert table ───────────────────────────────────────────────────────────────
@@ -138,6 +200,67 @@ async def get_events(limit: int = 50) -> list:
             "SELECT * FROM cpi_log ORDER BY id DESC LIMIT ?", (limit,)
         ) as cur:
             return [dict(r) for r in await cur.fetchall()]
+
+
+# ── Notifications ─────────────────────────────────────────────────────────────
+
+async def insert_notification(
+    alert_id: str,
+    role: str,
+    unit_id: str,
+    message: str,
+) -> int:
+    async with aiosqlite.connect(DB_PATH) as db:
+        cur = await db.execute(
+            """INSERT INTO notifications (alert_id, role, unit_id, message, sent_at)
+               VALUES (?, ?, ?, ?, ?)""",
+            (alert_id, role, unit_id, message, _now()),
+        )
+        await db.commit()
+        return cur.lastrowid or 0
+
+
+async def mark_notification_read(notification_id: int):
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute(
+            "UPDATE notifications SET read_at = ? WHERE id = ?",
+            (_now(), notification_id),
+        )
+        await db.commit()
+
+
+async def get_notifications(role: str = None, limit: int = 20) -> list:
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        if role:
+            async with db.execute(
+                "SELECT * FROM notifications WHERE role = ? ORDER BY id DESC LIMIT ?",
+                (role, limit),
+            ) as cur:
+                return [dict(r) for r in await cur.fetchall()]
+        else:
+            async with db.execute(
+                "SELECT * FROM notifications ORDER BY id DESC LIMIT ?", (limit,)
+            ) as cur:
+                return [dict(r) for r in await cur.fetchall()]
+
+
+# ── Historical incidents ──────────────────────────────────────────────────────
+
+async def get_historical_incidents(corridor: str = None) -> list:
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        if corridor:
+            async with db.execute(
+                "SELECT * FROM historical_incidents WHERE corridor = ? ORDER BY year DESC",
+                (corridor,),
+            ) as cur:
+                return [dict(r) for r in await cur.fetchall()]
+        else:
+            async with db.execute(
+                "SELECT * FROM historical_incidents ORDER BY year DESC"
+            ) as cur:
+                return [dict(r) for r in await cur.fetchall()]
 
 
 # ── Helpers ────────────────────────────────────────────────────────────────────
