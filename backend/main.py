@@ -27,7 +27,10 @@ from database import (
     init_db, insert_alert, ack_alert, get_alerts, log_cpi, get_events,
     get_alert_by_id, insert_notification, get_notifications,
     get_historical_incidents, log_call, get_call_log,
+    save_alert_reply, get_alert_replies, get_all_replies
 )
+from auth import login, verify_token, has_permission
+from auth import get_all_sessions, PERMISSIONS, get_session
 from call_service import trigger_corridor_calls, make_alert_call
 from report_generator import generate_alert_report
 from replay_data import REPLAY_FRAMES
@@ -136,6 +139,7 @@ called_alert_ids: set = set()
 
 # ── Import new simulator ─────────────────────────────────────────────────────
 from simulator import get_simulator
+from bus_simulator import BusSimulator
 
 # ── Corridor simulator state ──────────────────────────────────────────────────
 CORRIDORS = ["Ambaji", "Dwarka", "Somnath", "Pavagadh"]
@@ -143,6 +147,9 @@ _bus_tick = 0
 
 # Get the singleton simulator instance
 simulator = get_simulator()
+
+# Initialize bus simulator
+bus_simulator = BusSimulator()
 
 
 async def handle_new_alert(data: dict):
@@ -179,12 +186,40 @@ async def startup():
     simulator.set_alert_callback(handle_new_alert)
     asyncio.create_task(simulator.run())
     
+    # Start bus simulator
+    asyncio.create_task(run_bus_simulator())
+    
     print("=== Simulator started ===")
     if _ML_AVAILABLE:
         try:
             load_models()
         except FileNotFoundError:
             print("[main] ML models not yet trained — run `python -m ml.train`")
+
+async def run_bus_simulator():
+    """Background task to update and broadcast bus positions every 5 seconds."""
+    while True:
+        try:
+            # Get current CPI data for bus alert status
+            cpi_data = {}
+            for corridor in CORRIDORS:
+                if corridor in simulator.corridor_data:
+                    cpi_data[corridor] = simulator.corridor_data[corridor].get('cpi', 0)
+            
+            # Update bus positions
+            bus_data = bus_simulator.update(cpi_data)
+            
+            # Broadcast to all connected clients
+            await manager.broadcast({
+                "type": "bus_update",
+                "buses": bus_data,
+                "timestamp": datetime.utcnow().isoformat()
+            })
+            
+        except Exception as e:
+            print(f"[BUS ERROR] {e}")
+        
+        await asyncio.sleep(5)
 
 
 # ── Health ────────────────────────────────────────────────────────────────────
@@ -218,49 +253,133 @@ async def websocket_endpoint(websocket: WebSocket):
         manager.disconnect(websocket)
 
 
-# ── Auth ──────────────────────────────────────────────────────────────────────
-class LoginBody(BaseModel):
-    role: str
-    username: str
-    password: str
-    unit_id: Optional[str] = None
-
-
+# ── Auth endpoints ───────────────────────────
 @app.post("/api/login")
-async def login(body: LoginBody):
-    user = DEMO_USERS.get(body.username)
-    if not user:
-        raise HTTPException(401, "Invalid username or password")
-    if user["password"] != body.password:
-        raise HTTPException(401, "Invalid username or password")
-    if user["role"] != body.role:
-        raise HTTPException(401, f"Username does not match role '{body.role}'")
-
-    token = _make_token(user["role"], user["unit_id"])
-    _active_sessions[token] = {
-        "role":     user["role"],
-        "unit_id":  user["unit_id"],
-        "name":     user["name"],
-        "username": body.username,
-    }
-
-    redirect_url = ROLE_REDIRECT.get(user["role"], "/") + f"&token={token}"
-
-    return {
-        "token":        token,
-        "role":         user["role"],
-        "unit_id":      user["unit_id"],
-        "name":         user["name"],
-        "redirect_url": redirect_url,
-    }
-
+async def api_login(data: dict):
+    result = login(data.get("username", ""),
+                  data.get("password", ""))
+    if not result:
+        raise HTTPException(status_code=401,
+                          detail="Invalid username or password")
+    return result
 
 @app.get("/api/me")
-async def me(token: str):
-    session = _active_sessions.get(token)
+async def get_me(authorization: str = ""):
+    token = authorization.replace("Bearer ", "")
+    session = verify_token(token)
     if not session:
-        raise HTTPException(401, "Invalid or expired token")
+        raise HTTPException(status_code=401, detail="Invalid token")
     return session
+
+@app.post("/api/logout")
+async def api_logout(data: dict):
+    from auth import sessions
+    token = data.get("token", "")
+    sessions.pop(token, None)
+    return {"status": "logged_out"}
+
+# ── Alert reply endpoint ─────────────────────
+@app.post("/api/alert/reply")
+async def submit_alert_reply(data: dict):
+    """Agency submits their action in response to alert.
+    Body: {token, alert_id, corridor, action_taken,
+           status, notes, ack_time_seconds}
+    """
+    token = data.get("token", "")
+    session = verify_token(token)
+    if not session:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    
+    if not has_permission(token, "reply_alert"):
+        raise HTTPException(status_code=403,
+                          detail="Permission denied")
+    
+    user_session = get_session(token)
+    replied_at = datetime.utcnow().isoformat()
+    
+    async with aiosqlite.connect("stampede.db") as db:
+        await save_alert_reply(
+            db=db,
+            alert_id=data.get("alert_id"),
+            corridor=data.get("corridor"),
+            role=session["role"],
+            unit_id=session["unit_id"],
+            responder_name=user_session["name"] if user_session else "Unknown",
+            action_taken=data.get("action_taken", ""),
+            status=data.get("status", "ACKNOWLEDGED"),
+            notes=data.get("notes", ""),
+            replied_at=replied_at,
+            ack_time_seconds=data.get("ack_time_seconds", 0)
+        )
+    
+    # Broadcast reply to all dashboards
+    await manager.broadcast({
+        "type": "alert_reply",
+        "alert_id": data.get("alert_id"),
+        "corridor": data.get("corridor"),
+        "role": session["role"],
+        "responder": user_session["name"] if user_session else "Unknown",
+        "unit_id": session["unit_id"],
+        "action_taken": data.get("action_taken"),
+        "status": data.get("status"),
+        "replied_at": replied_at
+    })
+    
+    return {
+        "status": "reply_saved",
+        "alert_id": data.get("alert_id"),
+        "role": session["role"]
+    }
+
+@app.get("/api/alert/{alert_id}/replies")
+async def get_replies_for_alert(alert_id: str):
+    async with aiosqlite.connect("stampede.db") as db:
+        return await get_alert_replies(db, alert_id)
+
+# ── Admin endpoints ──────────────────────────
+@app.get("/api/admin/sessions")
+async def admin_get_sessions(token: str = ""):
+    if not has_permission(token, "view_admin"):
+        raise HTTPException(status_code=403,
+                          detail="Admin only")
+    return get_all_sessions()
+
+@app.get("/api/admin/replies")
+async def admin_get_all_replies(token: str = ""):
+    if not has_permission(token, "view_all_replies"):
+        raise HTTPException(status_code=403,
+                          detail="Admin only")
+    async with aiosqlite.connect("stampede.db") as db:
+        return await get_all_replies(db)
+
+@app.get("/api/admin/stats")
+async def admin_get_stats(token: str = ""):
+    if not has_permission(token, "view_admin"):
+        raise HTTPException(status_code=403,
+                          detail="Admin only")
+    
+    async with aiosqlite.connect("stampede.db") as db:
+        alerts_cur = await db.execute("SELECT COUNT(*) FROM alerts")
+        alert_count = (await alerts_cur.fetchone())[0]
+        
+        replies_cur = await db.execute("SELECT COUNT(*) FROM alert_replies")
+        reply_count = (await replies_cur.fetchone())[0]
+        
+        calls_cur = await db.execute("SELECT COUNT(*) FROM call_log")
+        call_count = (await calls_cur.fetchone())[0]
+    
+    reports_dir = Path("reports")
+    pdf_count = len(list(reports_dir.glob("*.pdf"))) if reports_dir.exists() else 0
+    
+    return {
+        "total_alerts": alert_count,
+        "total_replies": reply_count,
+        "total_calls": call_count,
+        "total_pdf_reports": pdf_count,
+        "active_sessions": len(get_all_sessions()),
+        "corridors_monitored": 4,
+        "system_status": "operational"
+    }
 
 
 # ── Corridors ─────────────────────────────────────────────────────────────────

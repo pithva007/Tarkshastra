@@ -87,6 +87,22 @@ async def init_db():
             )
         """)
 
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS alert_replies (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                alert_id TEXT NOT NULL,
+                corridor TEXT NOT NULL,
+                role TEXT NOT NULL,
+                unit_id TEXT NOT NULL,
+                responder_name TEXT NOT NULL,
+                action_taken TEXT NOT NULL,
+                status TEXT NOT NULL,
+                notes TEXT,
+                replied_at TEXT NOT NULL,
+                ack_time_seconds INTEGER
+            )
+        """)
+
         # Migration: add ml_confidence column if it doesn't exist yet
         try:
             await db.execute("ALTER TABLE alerts ADD COLUMN ml_confidence REAL DEFAULT NULL")
@@ -323,3 +339,37 @@ async def get_call_log(db, limit: int = 50) -> list:
         dict(zip([col[0] for col in cursor.description], row))
         for row in rows
     ]
+
+
+async def save_alert_reply(db, alert_id, corridor,
+                          role, unit_id, responder_name, action_taken,
+                          status, notes, replied_at, ack_time_seconds):
+    await db.execute("""
+        INSERT INTO alert_replies
+        (alert_id, corridor, role, unit_id,
+         responder_name, action_taken, status,
+         notes, replied_at, ack_time_seconds)
+        VALUES (?,?,?,?,?,?,?,?,?,?)
+    """, (alert_id, corridor, role, unit_id,
+          responder_name, action_taken, status,
+          notes, replied_at, ack_time_seconds))
+    await db.commit()
+
+
+async def get_alert_replies(db, alert_id: str):
+    cursor = await db.execute("""
+        SELECT * FROM alert_replies
+        WHERE alert_id = ?
+        ORDER BY replied_at ASC
+    """, (alert_id,))
+    rows = await cursor.fetchall()
+    return [dict(zip([c[0] for c in cursor.description], row)) for row in rows]
+
+
+async def get_all_replies(db, limit=100):
+    cursor = await db.execute("""
+        SELECT * FROM alert_replies
+        ORDER BY replied_at DESC LIMIT ?
+    """, (limit,))
+    rows = await cursor.fetchall()
+    return [dict(zip([c[0] for c in cursor.description], row)) for row in rows]

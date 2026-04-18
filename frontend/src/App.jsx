@@ -1,581 +1,678 @@
-import { useState, useEffect, useRef } from 'react'
+import React, { useState, useEffect } from 'react'
 import axios from 'axios'
-import {
-  LineChart, Line, XAxis, YAxis, CartesianGrid,
-  Tooltip, ReferenceLine, ResponsiveContainer,
-} from 'recharts'
 
-import { useWebSocket }       from './hooks/useWebSocket'
-import { useNotifications }   from './hooks/useNotifications'
-import { triggerVoiceAlert }  from './utils/voiceAlert'
+import { useWebSocket } from './hooks/useWebSocket'
+import { useNotifications } from './hooks/useNotifications'
 
-import PressureGauge          from './components/PressureGauge'
-import AgencyPanel            from './components/AgencyPanel'
-import AlertBanner            from './components/AlertBanner'
-import ReplayMode             from './components/ReplayMode'
-import CorridorMap            from './components/CorridorMap'
-import EventLog               from './components/EventLog'
-import WhatIfSimulator        from './components/WhatIfSimulator'
-import CorridorCompare        from './components/CorridorCompare'
-import NotificationBell       from './components/NotificationBell'
-import DriverDashboard        from './components/DriverDashboard'
-import HistoricalPanel        from './components/HistoricalPanel'
-import Login                  from './pages/Login'
+import PressureGauge from './components/PressureGauge'
+import AgencyPanel from './components/AgencyPanel'
+import AlertBanner from './components/AlertBanner'
+import ReplayMode from './components/ReplayMode'
+import CorridorMap from './components/CorridorMap'
+import EventLog from './components/EventLog'
+import WhatIfSimulator from './components/WhatIfSimulator'
+import CorridorCompare from './components/CorridorCompare'
+import NotificationBell from './components/NotificationBell'
+import HistoricalPanel from './components/HistoricalPanel'
+import AlertReplyModal from './components/AlertReplyModal'
+import AdminPanel from './components/AdminPanel'
+import PDFViewer from './components/PDFViewer'
+import Login from './pages/Login'
 
-const API       = import.meta.env.VITE_API_URL || 'http://localhost:8000'
-const CORRIDORS = ['Ambaji', 'Dwarka', 'Somnath', 'Pavagadh']
-const AGENCIES  = ['police', 'temple', 'gsrtc']
-const TABS      = ['Dashboard', 'Compare', 'Map', 'History', 'Replay', 'Events']
+const API = import.meta.env.VITE_API_URL || 'http://localhost:8000'
 
-const AGENCY_LABELS = { police: 'Police', temple: 'Temple Trust', gsrtc: 'GSRTC', driver: 'Driver' }
-
-// Read URL param
-const param = (key) => new URLSearchParams(window.location.search).get(key)
-
-// ── Colour helpers ─────────────────────────────────────────────────────────────
-const cpiColor  = (v) => v == null ? 'text-gray-400' : v >= 0.70 ? 'text-red-400' : v >= 0.40 ? 'text-amber-400' : 'text-green-400'
-const cpiBorder = (v) => v == null ? 'border-gray-700' : v >= 0.70 ? 'border-red-600' : v >= 0.40 ? 'border-amber-600' : 'border-green-600'
-const cpiRing   = (v, sel) => sel ? `ring-2 ${v >= 0.70 ? 'ring-red-500' : v >= 0.40 ? 'ring-amber-500' : 'ring-green-500'}` : ''
-
-// ── Auth helpers ───────────────────────────────────────────────────────────────
-function getStoredAuth() {
-  return {
-    token: localStorage.getItem('ts11_token'),
-    role:  localStorage.getItem('ts11_role'),
-    name:  localStorage.getItem('ts11_name'),
-    unit:  localStorage.getItem('ts11_unit'),
-  }
+const ROLE_COLORS = {
+  police: '#3B82F6',
+  gsrtc: '#F59E0B',
+  temple: '#8B5CF6',
+  admin: '#EF4444'
 }
 
-function clearAuth() {
-  localStorage.removeItem('ts11_token')
-  localStorage.removeItem('ts11_role')
-  localStorage.removeItem('ts11_name')
-  localStorage.removeItem('ts11_unit')
+const ROLE_TABS = {
+  police: ['Dashboard', 'Compare', 'Map', 'History', 'Alerts', 'Events'],
+  gsrtc: ['Dashboard', 'Compare', 'Map', 'Buses', 'Alerts', 'Events'],
+  temple: ['Dashboard', 'Compare', 'Map', 'History', 'Alerts', 'Events'],
+  admin: ['Dashboard', 'Compare', 'Map', 'History', 'Replay', 'Alerts', 'Events', 'Admin']
 }
 
-// ── Connection status badge ────────────────────────────────────────────────────
-function ConnectionBadge({ status, retryCount }) {
-  if (status === 'connected') {
-    return (
-      <span className="flex items-center gap-1.5 text-gray-400 text-xs">
-        <span className="w-2 h-2 rounded-full bg-green-400" />
-        Live
-      </span>
-    )
-  }
-  if (status === 'connecting') {
-    return (
-      <span className="flex items-center gap-1.5 text-gray-400 text-xs">
-        <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
-        Reconnecting...
-      </span>
-    )
-  }
-  return (
-    <span className="flex items-center gap-1.5 text-gray-400 text-xs">
-      <span className="w-2 h-2 rounded-full bg-red-500" />
-      {retryCount >= 5 ? 'Offline' : 'Disconnected'}
-    </span>
-  )
-}
-
-// ── ML Confidence Badge ────────────────────────────────────────────────────────
-function ConfidenceBadge({ surgeType, confidence, riskLevel }) {
-  if (!surgeType || surgeType === 'SAFE') return null
-  const label = surgeType === 'GENUINE_CRUSH' ? 'GENUINE CRUSH'
-    : surgeType === 'SELF_RESOLVING' ? 'SELF RESOLVING'
-    : surgeType.replace(/_/g, ' ')
-  const style =
-    riskLevel === 'CRITICAL' ? 'bg-red-900 text-red-200 border-red-700' :
-    riskLevel === 'HIGH'     ? 'bg-orange-900 text-orange-200 border-orange-700' :
-    riskLevel === 'MEDIUM'   ? 'bg-amber-900 text-amber-200 border-amber-700' :
-                               'bg-green-900 text-green-200 border-green-700'
-  return (
-    <div className={`inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1 rounded-full border ${style}`}>
-      <span>{label}</span>
-      {confidence != null && <span className="opacity-75">· {confidence}% confident</span>}
-    </div>
-  )
-}
-
-// ── App ────────────────────────────────────────────────────────────────────────
 export default function App() {
-  // Auth state
-  const [auth, setAuth] = useState(() => {
-    const stored = getStoredAuth()
-    // Also accept ?agency= param without full login (legacy / demo mode)
-    const urlAgency = param('agency')
-    if (stored.token && stored.role) return stored
-    if (urlAgency) return { token: null, role: urlAgency, name: null, unit: null }
-    return null
-  })
-
-  const agency = auth?.role ?? null
-
-  const [tab,              setTab]             = useState('Dashboard')
+  const [auth, setAuth] = useState(null)
+  const [activeTab, setActiveTab] = useState('Dashboard')
   const [selectedCorridor, setSelectedCorridor] = useState('Ambaji')
-  const [backendOk,        setBackendOk]        = useState(null)
-  const [mobileMenuOpen,   setMobileMenuOpen]   = useState(false)
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const [alertReplyModal, setAlertReplyModal] = useState(null)
+  const [pdfViewer, setPdfViewer] = useState(null)
 
-  const { corridorData, corridorHistory, connectionStatus, retryCount, busData } = useWebSocket()
+  const { corridorData, corridorHistory, connectionStatus, lastUpdate, busData } = useWebSocket()
+  const { notifications, unreadCount, markRead, markAllRead } = useNotifications(corridorData, auth?.role)
 
-  const { notifications, unreadCount, markRead, markAllRead } = useNotifications(corridorData, agency)
-
-  // Voice alert — fire once per alert_id when CPI > 0.75
-  const voiceFiredRef = useRef(new Set())
+  // Check for existing auth on load
   useEffect(() => {
-    if (!agency || agency === 'driver') return // driver handled in DriverDashboard
-    Object.values(corridorData).forEach((r) => {
-      if (r?.alert_active && r?.cpi > 0.75 && r?.alert_id) {
-        if (!voiceFiredRef.current.has(r.alert_id)) {
-          voiceFiredRef.current.add(r.alert_id)
-          const ttb = r.time_to_breach_minutes ?? 5
-          triggerVoiceAlert(r.corridor, r.cpi, Math.ceil(ttb), agency)
-        }
-      }
-    })
-  }, [corridorData, agency])
-
-  useEffect(() => {
-    axios.get(`${API}/health`)
-      .then(() => setBackendOk(true))
-      .catch(() => setBackendOk(false))
+    const token = localStorage.getItem('auth_token')
+    const role = localStorage.getItem('user_role')
+    
+    if (token && role) {
+      // Verify token with backend
+      axios.get(`${API}/api/me`, {
+        headers: { Authorization: `Bearer ${token}` }
+      })
+      .then(response => {
+        setAuth({
+          token,
+          role: response.data.role,
+          name: response.data.name,
+          unit_id: response.data.unit_id,
+          display_name: response.data.display_name,
+          color: response.data.color,
+          permissions: response.data.permissions
+        })
+      })
+      .catch(() => {
+        // Token invalid, clear storage
+        localStorage.removeItem('auth_token')
+        localStorage.removeItem('user_role')
+      })
+    }
   }, [])
 
-  const handleLogin = (data) => {
-    setAuth({ token: data.token, role: data.role, name: data.name, unit: data.unit_id })
-    // Update URL without reload
-    const url = new URL(window.location.href)
-    url.searchParams.set('agency', data.role)
-    url.searchParams.set('token', data.token)
-    window.history.replaceState({}, '', url.toString())
+  // Handle alert reply requirement
+  useEffect(() => {
+    if (!auth || !corridorData) return
+
+    // Check for active alerts that need response
+    Object.values(corridorData).forEach(corridor => {
+      if (corridor.alert_active && corridor.alert_id && !alertReplyModal) {
+        // Show reply modal for this alert
+        setAlertReplyModal({
+          alert_id: corridor.alert_id,
+          corridor: corridor.corridor || selectedCorridor,
+          cpi: corridor.cpi,
+          surge_type: corridor.surge_type
+        })
+      }
+    })
+  }, [corridorData, auth, alertReplyModal, selectedCorridor])
+
+  // Handle PDF ready notifications
+  useEffect(() => {
+    notifications.forEach(notification => {
+      if (notification.type === 'pdf_ready' && !notification.read) {
+        // Auto-mark as read and show banner
+        markRead(notification.id)
+      }
+    })
+  }, [notifications, markRead])
+
+  const handleLogin = (authData) => {
+    setAuth(authData)
+    localStorage.setItem('auth_token', authData.token)
+    localStorage.setItem('user_role', authData.role)
   }
 
   const handleLogout = () => {
-    clearAuth()
+    if (auth?.token) {
+      axios.post(`${API}/api/logout`, { token: auth.token }).catch(() => {})
+    }
+    localStorage.removeItem('auth_token')
+    localStorage.removeItem('user_role')
     setAuth(null)
-    window.history.replaceState({}, '', '/')
+    setAlertReplyModal(null)
+    setPdfViewer(null)
   }
 
-  // Show login if no auth at all
+  const handleAlertReplied = (alertId) => {
+    setAlertReplyModal(null)
+    // Show PDF viewer after reply
+    setPdfViewer(alertId)
+  }
+
+  const getConnectionStatusColor = () => {
+    switch (connectionStatus) {
+      case 'connected': return '#22c55e'
+      case 'connecting': return '#f59e0b'
+      default: return '#ef4444'
+    }
+  }
+
+  const getConnectionStatusText = () => {
+    switch (connectionStatus) {
+      case 'connected': return 'Live'
+      case 'connecting': return 'Reconnecting...'
+      default: return 'Disconnected'
+    }
+  }
+
+  // Show login if not authenticated
   if (!auth) {
     return <Login onLogin={handleLogin} />
   }
 
-  // Driver gets their own dedicated view
-  if (agency === 'driver') {
-    return (
-      <div className="min-h-screen bg-gray-950 text-white">
-        <header className="bg-gray-900 border-b border-gray-800 sticky top-0 z-40">
-          <div className="max-w-2xl mx-auto px-4 py-3 flex items-center justify-between">
-            <div>
-              <h1 className="text-sm font-bold text-white">Driver Dashboard</h1>
-              <p className="text-xs text-gray-500">{auth.name ?? 'Driver'} · {auth.unit}</p>
-            </div>
-            <div className="flex items-center gap-3">
-              <NotificationBell
-                notifications={notifications}
-                unreadCount={unreadCount}
-                onMarkRead={markRead}
-                onMarkAllRead={markAllRead}
-              />
-              <ConnectionBadge status={connectionStatus} retryCount={retryCount} />
-              <button onClick={handleLogout} className="text-xs text-gray-500 hover:text-white transition-colors">
-                Logout
-              </button>
-            </div>
-          </div>
-        </header>
-        <main className="max-w-2xl mx-auto px-4 py-6">
-          <DriverDashboard
-            buses={busData}
-            corridorData={corridorData}
-            driverBusId={auth.unit}
-            driverName={auth.name}
-          />
-        </main>
-      </div>
-    )
-  }
-
-  const current     = corridorData[selectedCorridor] || null
-  const currentHist = corridorHistory[selectedCorridor] || []
-  const allReadings = Object.values(corridorData)
+  const userTabs = ROLE_TABS[auth.role] || ROLE_TABS.police
+  const accentColor = ROLE_COLORS[auth.role] || ROLE_COLORS.police
 
   return (
-    <div className="min-h-screen bg-gray-950 text-white">
+    <div style={{
+      minHeight: '100vh',
+      background: '#0f172a',
+      color: '#f1f5f9'
+    }}>
+      {/* Alert Banner */}
+      <AlertBanner readings={Object.values(corridorData)} />
 
-      <AlertBanner readings={allReadings} />
-
-      {/* ── Header ── */}
-      <header className="bg-gray-900 border-b border-gray-800 sticky top-0 z-40">
-        <div className="max-w-7xl mx-auto px-4 md:px-8 py-3 flex items-center justify-between gap-4">
-          <div className="flex items-center gap-3 min-w-0">
-            <div className="min-w-0">
-              <h1 className="text-sm font-bold text-white tracking-wide truncate">
+      {/* Navigation Header */}
+      <header style={{
+        background: '#1e293b',
+        borderBottom: `2px solid ${accentColor}`,
+        position: 'sticky',
+        top: 0,
+        zIndex: 40
+      }}>
+        <div style={{
+          maxWidth: '1400px',
+          margin: '0 auto',
+          padding: '0 16px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          height: '64px'
+        }}>
+          {/* Logo & Title */}
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '16px'
+          }}>
+            <div>
+              <h1 style={{
+                fontSize: '18px',
+                fontWeight: '700',
+                color: '#f1f5f9',
+                margin: 0
+              }}>
                 Stampede Window Predictor
-                {agency && (
-                  <span className="ml-2 text-amber-400">
-                    [{AGENCY_LABELS[agency] || agency}]
-                  </span>
-                )}
               </h1>
-              <p className="text-xs text-gray-500">Gujarat Pilgrimage Corridors · Navratri</p>
+              <p style={{
+                fontSize: '12px',
+                color: '#94a3b8',
+                margin: 0
+              }}>
+                Gujarat Pilgrimage Corridors
+              </p>
             </div>
           </div>
 
-          <div className="flex items-center gap-3 flex-shrink-0 text-xs">
-            <span className="hidden sm:flex items-center gap-1.5 text-gray-400">
-              <span className={`w-2 h-2 rounded-full ${
-                backendOk === null ? 'bg-gray-400 animate-pulse' : backendOk ? 'bg-green-400' : 'bg-red-400'
-              }`} />
-              {backendOk === null ? 'Waking…' : backendOk ? 'Backend OK' : 'Backend Down'}
+          {/* Right Side Controls */}
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '16px'
+          }}>
+            {/* Role Badge */}
+            <div style={{
+              padding: '6px 12px',
+              background: `${accentColor}20`,
+              color: accentColor,
+              borderRadius: '20px',
+              fontSize: '12px',
+              fontWeight: '600',
+              textTransform: 'capitalize',
+              border: `1px solid ${accentColor}40`
+            }}>
+              {auth.role}
+            </div>
+
+            {/* User Name */}
+            <span style={{
+              fontSize: '14px',
+              color: '#94a3b8'
+            }}>
+              {auth.name}
             </span>
 
-            <ConnectionBadge status={connectionStatus} retryCount={retryCount} />
+            {/* Connection Status */}
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              fontSize: '12px',
+              color: '#94a3b8'
+            }}>
+              <div style={{
+                width: '8px',
+                height: '8px',
+                borderRadius: '50%',
+                background: getConnectionStatusColor()
+              }} />
+              {getConnectionStatusText()}
+            </div>
 
+            {/* Notification Bell */}
             <NotificationBell
               notifications={notifications}
               unreadCount={unreadCount}
               onMarkRead={markRead}
               onMarkAllRead={markAllRead}
+              onPDFClick={(alertId) => setPdfViewer(alertId)}
             />
 
-            {/* Mobile hamburger menu */}
+            {/* Mobile Menu Button */}
             <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="md:hidden p-2 rounded-lg hover:bg-gray-800 transition-colors"
+              style={{
+                display: 'none',
+                padding: '8px',
+                background: 'transparent',
+                border: 'none',
+                color: '#94a3b8',
+                cursor: 'pointer'
+              }}
             >
-              <div className="w-5 h-5 flex flex-col justify-center space-y-1">
-                <div className="w-full h-0.5 bg-white"></div>
-                <div className="w-full h-0.5 bg-white"></div>
-                <div className="w-full h-0.5 bg-white"></div>
-              </div>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                <line x1="3" y1="6" x2="21" y2="6"/>
+                <line x1="3" y1="12" x2="21" y2="12"/>
+                <line x1="3" y1="18" x2="21" y2="18"/>
+              </svg>
             </button>
 
-            {!agency && (
-              <div className="hidden md:flex gap-1">
-                {AGENCIES.map((ag) => (
-                  <a key={ag} href={`?agency=${ag}`}
-                    className="px-2 py-1 rounded bg-gray-800 hover:bg-gray-700 text-gray-300 text-xs transition-colors capitalize">
-                    {ag}
-                  </a>
-                ))}
-              </div>
-            )}
-
-            {auth.token && (
-              <button
-                onClick={handleLogout}
-                className="hidden md:block px-2 py-1 rounded bg-gray-800 hover:bg-gray-700 text-gray-400 text-xs transition-colors"
-              >
-                Logout
-              </button>
-            )}
-
+            {/* Logout Button */}
             <button
-              onClick={() => setTab('Compare')}
-              className="hidden md:block px-2 py-1 rounded bg-indigo-900 hover:bg-indigo-800 text-indigo-300 text-xs transition-colors font-medium"
+              onClick={handleLogout}
+              style={{
+                padding: '8px 16px',
+                background: '#374151',
+                color: '#f1f5f9',
+                border: 'none',
+                borderRadius: '8px',
+                fontSize: '14px',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px'
+              }}
             >
-              Compare All
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+                <polyline points="16,17 21,12 16,7"/>
+                <line x1="21" y1="12" x2="9" y2="12"/>
+              </svg>
+              Logout
             </button>
           </div>
         </div>
 
-        {/* Mobile menu overlay */}
-        {mobileMenuOpen && (
-          <div className="md:hidden fixed inset-0 bg-gray-900 z-50 flex flex-col">
-            <div className="flex items-center justify-between p-4 border-b border-gray-700">
-              <h2 className="text-lg font-bold text-white">Menu</h2>
-              <button
-                onClick={() => setMobileMenuOpen(false)}
-                className="p-2 rounded-lg hover:bg-gray-800 text-white text-xl"
-              >
-                ×
-              </button>
-            </div>
-            <div className="flex-1 p-4 space-y-4">
-              {!agency && (
-                <div className="space-y-2">
-                  <h3 className="text-sm font-bold text-gray-400 uppercase">Agencies</h3>
-                  {AGENCIES.map((ag) => (
-                    <a key={ag} href={`?agency=${ag}`}
-                      onClick={() => setMobileMenuOpen(false)}
-                      className="block px-4 py-3 rounded bg-gray-800 hover:bg-gray-700 text-white capitalize">
-                      {AGENCY_LABELS[ag] || ag}
-                    </a>
-                  ))}
-                </div>
-              )}
-              <div className="space-y-2">
-                <h3 className="text-sm font-bold text-gray-400 uppercase">Navigation</h3>
-                <button
-                  onClick={() => { setTab('Compare'); setMobileMenuOpen(false); }}
-                  className="block w-full text-left px-4 py-3 rounded bg-indigo-900 hover:bg-indigo-800 text-indigo-300"
-                >
-                  Compare All Corridors
-                </button>
-                {auth.token && (
-                  <button
-                    onClick={() => { handleLogout(); setMobileMenuOpen(false); }}
-                    className="block w-full text-left px-4 py-3 rounded bg-red-900 hover:bg-red-800 text-red-300"
-                  >
-                    Logout
-                  </button>
-                )}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Tabs */}
-        <div className="max-w-7xl mx-auto px-4 flex overflow-x-auto">
-          {TABS.map((t) => (
-            <button key={t} onClick={() => setTab(t)}
-              className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
-                tab === t
-                  ? 'border-amber-500 text-amber-400'
-                  : 'border-transparent text-gray-400 hover:text-white'
-              }`}>
-              {t}
+        {/* Tab Navigation */}
+        <div style={{
+          maxWidth: '1400px',
+          margin: '0 auto',
+          padding: '0 16px',
+          display: 'flex',
+          overflowX: 'auto'
+        }}>
+          {userTabs.map(tab => (
+            <button
+              key={tab}
+              onClick={() => setActiveTab(tab)}
+              style={{
+                padding: '12px 20px',
+                background: 'transparent',
+                border: 'none',
+                color: activeTab === tab ? accentColor : '#94a3b8',
+                fontSize: '14px',
+                fontWeight: '500',
+                cursor: 'pointer',
+                borderBottom: `2px solid ${activeTab === tab ? accentColor : 'transparent'}`,
+                whiteSpace: 'nowrap',
+                transition: 'all 0.2s ease'
+              }}
+            >
+              {tab}
             </button>
           ))}
         </div>
       </header>
 
-      {/* ── Main ── */}
-      <main className="max-w-7xl mx-auto px-4 py-6 space-y-6">
+      {/* Main Content */}
+      <main style={{
+        maxWidth: '1400px',
+        margin: '0 auto',
+        padding: '24px 16px'
+      }}>
+        {/* Corridor Selector (except for Events, Compare, Admin) */}
+        {!['Events', 'Compare', 'Admin'].includes(activeTab) && (
+          <div style={{
+            display: 'flex',
+            gap: '12px',
+            marginBottom: '24px',
+            flexWrap: 'wrap'
+          }}>
+            {['Ambaji', 'Dwarka', 'Somnath', 'Pavagadh'].map(corridor => {
+              const data = corridorData[corridor]
+              const cpi = data?.cpi || 0
+              const isSelected = selectedCorridor === corridor
+              
+              const getBorderColor = () => {
+                if (cpi >= 0.85) return '#ef4444'
+                if (cpi >= 0.70) return '#f59e0b'
+                if (cpi >= 0.40) return '#22c55e'
+                return '#334155'
+              }
 
-        {/* Corridor selector */}
-        {tab !== 'Events' && tab !== 'Compare' && (
-          <div className="flex gap-2 flex-wrap">
-            {CORRIDORS.map((c) => {
-              const r   = corridorData[c]
-              const cpi = r?.cpi
               return (
-                <button key={c} onClick={() => setSelectedCorridor(c)}
-                  className={`flex-1 min-w-[5rem] rounded-xl py-2.5 px-3 text-sm font-medium border transition-all ${
-                    selectedCorridor === c
-                      ? `${cpiBorder(cpi)} bg-gray-800 ${cpiRing(cpi, true)}`
-                      : 'border-gray-700 bg-gray-900 text-gray-400 hover:bg-gray-800'
-                  }`}>
-                  <span className="block">{c}</span>
-                  {cpi != null && (
-                    <span className={`font-mono text-xs ${cpiColor(cpi)}`}>
-                      {cpi.toFixed(3)}
-                    </span>
-                  )}
+                <button
+                  key={corridor}
+                  onClick={() => setSelectedCorridor(corridor)}
+                  style={{
+                    flex: '1',
+                    minWidth: '120px',
+                    padding: '16px',
+                    background: isSelected ? '#1e293b' : '#0f172a',
+                    border: `2px solid ${isSelected ? accentColor : getBorderColor()}`,
+                    borderRadius: '12px',
+                    color: '#f1f5f9',
+                    cursor: 'pointer',
+                    textAlign: 'center',
+                    transition: 'all 0.2s ease'
+                  }}
+                >
+                  <div style={{
+                    fontSize: '16px',
+                    fontWeight: '600',
+                    marginBottom: '4px'
+                  }}>
+                    {corridor}
+                  </div>
+                  <div style={{
+                    fontSize: '14px',
+                    fontFamily: 'monospace',
+                    color: cpi >= 0.85 ? '#ef4444' : cpi >= 0.70 ? '#f59e0b' : '#22c55e'
+                  }}>
+                    CPI {cpi.toFixed(3)}
+                  </div>
                 </button>
               )
             })}
           </div>
         )}
 
-        {/* ═══════════ DASHBOARD ═══════════ */}
-        {tab === 'Dashboard' && (
-          <div className="space-y-6">
-
-            {/* Row: gauge + metrics */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-              <div className={`rounded-2xl p-5 flex flex-col items-center justify-center bg-gray-900 border ${
-                current?.cpi >= 0.70 ? 'border-red-700' : current?.cpi >= 0.40 ? 'border-amber-700' : 'border-gray-700'
-              }`}>
+        {/* Tab Content */}
+        {activeTab === 'Dashboard' && (
+          <div style={{ display: 'grid', gap: '24px' }}>
+            {/* Pressure Gauge & Metrics */}
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
+              gap: '24px'
+            }}>
+              <div style={{
+                background: '#1e293b',
+                border: '1px solid #334155',
+                borderRadius: '16px',
+                padding: '24px',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center'
+              }}>
                 <PressureGauge
-                  cpi={current?.cpi}
+                  cpi={corridorData[selectedCorridor]?.cpi}
                   corridor={selectedCorridor}
-                  surgeType={current?.surge_type}
-                  timeToBreachMinutes={current?.time_to_breach_minutes}
+                  surgeType={corridorData[selectedCorridor]?.surge_type}
+                  timeToBreachMinutes={corridorData[selectedCorridor]?.time_to_breach_minutes}
                 />
-                {current && (
-                  <div className="mt-3">
-                    <ConfidenceBadge
-                      surgeType={current.surge_type}
-                      confidence={current.ml_confidence}
-                      riskLevel={current.ml_risk_level}
-                    />
+              </div>
+
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))',
+                gap: '16px'
+              }}>
+                {[
+                  { label: 'Flow Rate', value: `${Math.round(corridorData[selectedCorridor]?.flow_rate || 0)}/min`, color: '#3b82f6' },
+                  { label: 'Transport Burst', value: (corridorData[selectedCorridor]?.transport_burst || 0).toFixed(3), color: '#f59e0b' },
+                  { label: 'Chokepoint Density', value: (corridorData[selectedCorridor]?.chokepoint_density || 0).toFixed(3), color: '#8b5cf6' },
+                  { label: 'Time to Breach', value: corridorData[selectedCorridor]?.time_to_breach_minutes ? `${Math.round(corridorData[selectedCorridor].time_to_breach_minutes)}min` : '—', color: '#ef4444' }
+                ].map(metric => (
+                  <div key={metric.label} style={{
+                    background: '#1e293b',
+                    border: '1px solid #334155',
+                    borderRadius: '12px',
+                    padding: '16px'
+                  }}>
+                    <div style={{
+                      fontSize: '12px',
+                      color: '#94a3b8',
+                      marginBottom: '8px',
+                      textTransform: 'uppercase',
+                      fontWeight: '500'
+                    }}>
+                      {metric.label}
+                    </div>
+                    <div style={{
+                      fontSize: '20px',
+                      fontWeight: '700',
+                      color: metric.color,
+                      fontFamily: 'monospace'
+                    }}>
+                      {metric.value}
+                    </div>
                   </div>
-                )}
-              </div>
-
-              <div className="lg:col-span-2 grid grid-cols-2 md:grid-cols-3 gap-3">
-                <Metric label="CPI"
-                  value={current?.cpi?.toFixed(3) ?? '—'}
-                  sub="0 = safe · 1 = crush"
-                  accent={current?.cpi >= 0.70 ? 'red' : current?.cpi >= 0.40 ? 'amber' : 'green'} />
-                <Metric label="Time to Breach"
-                  value={current?.time_to_breach_seconds != null
-                    ? `${Math.floor(current.time_to_breach_seconds / 60)}m ${current.time_to_breach_seconds % 60 | 0}s`
-                    : '—'}
-                  sub="at CPI = 0.85"
-                  accent={current?.time_to_breach_seconds != null && current.time_to_breach_seconds < 720 ? 'red' : 'neutral'} />
-                <Metric label="Flow Rate"
-                  value={current?.flow_rate != null ? `${Math.round(current.flow_rate)}/min` : '—'}
-                  sub="pax per minute"
-                  accent="neutral" />
-                <Metric label="Transport Burst"
-                  value={current?.transport_burst?.toFixed(3) ?? '—'}
-                  sub="0–1 bus load factor"
-                  accent={current?.transport_burst > 0.7 ? 'amber' : 'neutral'} />
-                <Metric label="Chokepoint Density"
-                  value={current?.chokepoint_density?.toFixed(3) ?? '—'}
-                  sub="normalised 0–1"
-                  accent={current?.chokepoint_density > 0.7 ? 'amber' : 'neutral'} />
-                <Metric label="ML Risk"
-                  value={current?.ml_risk_level ?? '—'}
-                  sub={current?.ml_confidence != null ? `${current.ml_confidence}% confidence` : 'no model'}
-                  accent={
-                    current?.ml_risk_level === 'CRITICAL' ? 'red' :
-                    current?.ml_risk_level === 'HIGH'     ? 'amber' :
-                    current?.ml_risk_level === 'MEDIUM'   ? 'amber' : 'green'
-                  } />
-              </div>
-            </div>
-
-            {/* Alert inline */}
-            {current?.alert_active && (
-              <div className={`rounded-xl p-4 flex items-start gap-3 border ${
-                current.surge_type === 'GENUINE_CRUSH'
-                  ? 'bg-red-950 border-red-700 animate-pulse'
-                  : 'bg-amber-950 border-amber-700'
-              }`}>
-                <span className="text-2xl">{current.surge_type === 'GENUINE_CRUSH' ? '🚨' : '⚠️'}</span>
-                <div className="flex-1">
-                  <p className={`font-bold text-sm ${current.surge_type === 'GENUINE_CRUSH' ? 'text-red-300' : 'text-amber-300'}`}>
-                    {current.surge_type === 'GENUINE_CRUSH'
-                      ? `CRITICAL: Genuine crush developing in ${selectedCorridor}`
-                      : current.time_to_breach_seconds != null
-                      ? `WARNING: Breach predicted in ${Math.ceil(current.time_to_breach_seconds / 60)} min — ${selectedCorridor}`
-                      : `ALERT: High pressure in ${selectedCorridor}`
-                    }
-                  </p>
-                  <p className="text-xs text-gray-400 mt-0.5">
-                    ID: {current.alert_id} · CPI {current.cpi?.toFixed(3)}
-                    {current.ml_confidence != null && ` · ML: ${current.ml_confidence}% · ${current.ml_risk_level}`}
-                  </p>
-                </div>
-                {/* Manual voice alert button */}
-                <button
-                  onClick={() => triggerVoiceAlert(
-                    selectedCorridor,
-                    current.cpi,
-                    Math.ceil(current.time_to_breach_minutes ?? 5),
-                    agency ?? 'police'
-                  )}
-                  className="text-xs px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-white transition-colors whitespace-nowrap"
-                >
-                  🔊 Play Alert
-                </button>
-              </div>
-            )}
-
-            {/* Live CPI chart */}
-            <div className="bg-gray-900 rounded-xl p-4">
-              <p className="text-xs text-gray-400 uppercase tracking-wide mb-3">
-                Live CPI — {selectedCorridor} (last {currentHist.length} readings)
-              </p>
-              <ResponsiveContainer width="100%" height={160}>
-                <LineChart data={currentHist} margin={{ top: 4, right: 6, left: -24, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#1f2937" />
-                  <XAxis dataKey="t" tick={false} />
-                  <YAxis domain={[0, 1]} tick={{ fontSize: 10, fill: '#6b7280' }} />
-                  <Tooltip contentStyle={{ background: '#111827', border: '1px solid #374151', borderRadius: 8, fontSize: 11 }} />
-                  <ReferenceLine y={0.85} stroke="#ef4444" strokeDasharray="4 3" />
-                  <ReferenceLine y={0.70} stroke="#f59e0b" strokeDasharray="2 4" />
-                  <ReferenceLine y={0.40} stroke="#22c55e" strokeDasharray="2 4" />
-                  <Line type="monotone" dataKey="cpi" stroke="#f59e0b" strokeWidth={2} dot={false} isAnimationActive={false} />
-                </LineChart>
-              </ResponsiveContainer>
-            </div>
-
-            {/* Agency panels */}
-            <div>
-              <h2 className="text-sm font-bold text-gray-300 uppercase tracking-wide mb-3">
-                {agency ? `${AGENCY_LABELS[agency] || agency} — Action Panel` : '3-Agency Coordination Centre'}
-              </h2>
-              <div className={`grid gap-4 ${agency ? 'grid-cols-1 max-w-lg' : 'grid-cols-1 md:grid-cols-3'}`}>
-                {(agency && agency !== 'driver' ? [agency] : AGENCIES).map((ag) => (
-                  <AgencyPanel
-                    key={ag}
-                    agency={ag}
-                    corridorData={corridorData}
-                    selectedCorridor={selectedCorridor}
-                  />
                 ))}
               </div>
             </div>
 
+            {/* Agency Panel */}
+            <AgencyPanel
+              agency={auth.role}
+              corridorData={corridorData}
+              selectedCorridor={selectedCorridor}
+            />
+
+            {/* What-If Simulator */}
             <WhatIfSimulator />
           </div>
         )}
 
-        {/* ═══════════ COMPARE ═══════════ */}
-        {tab === 'Compare' && (
+        {activeTab === 'Compare' && (
           <CorridorCompare
-            readings={allReadings}
-            onSelect={(c) => { setSelectedCorridor(c); setTab('Dashboard') }}
+            readings={Object.values(corridorData)}
+            onSelect={(corridor) => {
+              setSelectedCorridor(corridor)
+              setActiveTab('Dashboard')
+            }}
           />
         )}
 
-        {/* ═══════════ MAP ═══════════ */}
-        {tab === 'Map' && (
-          <div className="space-y-4">
-            <CorridorMap
-              readings={allReadings}
-              buses={busData}
-              selected={selectedCorridor}
-              onSelect={setSelectedCorridor}
-            />
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-              {CORRIDORS.map((c) => {
-                const r   = corridorData[c]
-                const cpi = r?.cpi
-                return (
-                  <button key={c} onClick={() => setSelectedCorridor(c)}
-                    className={`rounded-xl p-3 text-left border transition-all ${cpiBorder(cpi)} ${
-                      selectedCorridor === c ? 'bg-gray-800 ring-2 ring-white' : 'bg-gray-900'
-                    }`}>
-                    <p className="text-xs text-gray-400">{c}</p>
-                    <p className={`text-2xl font-bold font-mono ${cpiColor(cpi)}`}>
-                      {cpi?.toFixed(3) ?? '…'}
-                    </p>
-                    {r?.surge_type && r.surge_type !== 'SAFE' && (
-                      <p className="text-xs text-amber-400 mt-1">{r.surge_type}</p>
-                    )}
-                    {r?.ml_confidence != null && (
-                      <p className="text-xs text-blue-400 mt-0.5">ML: {r.ml_confidence}%</p>
-                    )}
-                  </button>
-                )
-              })}
-            </div>
-          </div>
+        {activeTab === 'Map' && (
+          <CorridorMap
+            corridorData={corridorData}
+            busData={busData}
+          />
         )}
 
-        {/* ═══════════ HISTORY ═══════════ */}
-        {tab === 'History' && (
+        {activeTab === 'History' && (
           <HistoricalPanel corridor={selectedCorridor} />
         )}
 
-        {/* ═══════════ REPLAY ═══════════ */}
-        {tab === 'Replay' && <ReplayMode />}
+        {activeTab === 'Replay' && auth.role === 'admin' && (
+          <ReplayMode />
+        )}
 
-        {/* ═══════════ EVENTS ═══════════ */}
-        {tab === 'Events' && <EventLog />}
+        {activeTab === 'Alerts' && (
+          <div style={{
+            background: '#1e293b',
+            border: '1px solid #334155',
+            borderRadius: '16px',
+            padding: '24px'
+          }}>
+            <h2 style={{
+              fontSize: '20px',
+              fontWeight: '600',
+              color: '#f1f5f9',
+              marginBottom: '16px'
+            }}>
+              Alert Management
+            </h2>
+            <p style={{
+              color: '#94a3b8',
+              marginBottom: '16px'
+            }}>
+              Active alerts and response status for all corridors.
+            </p>
+            {/* Alert management content would go here */}
+          </div>
+        )}
 
+        {activeTab === 'Events' && (
+          <EventLog />
+        )}
+
+        {activeTab === 'Admin' && auth.role === 'admin' && (
+          <AdminPanel token={auth.token} />
+        )}
+
+        {activeTab === 'Buses' && auth.role === 'gsrtc' && (
+          <div style={{
+            background: '#1e293b',
+            border: '1px solid #334155',
+            borderRadius: '16px',
+            padding: '24px'
+          }}>
+            <h2 style={{
+              fontSize: '20px',
+              fontWeight: '600',
+              color: '#f1f5f9',
+              marginBottom: '16px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '12px'
+            }}>
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" strokeWidth="1.5">
+                <rect x="1" y="3" width="15" height="13" rx="2"/>
+                <path d="M16 8h4l3 3v4h-7V8z"/>
+                <circle cx="5.5" cy="18.5" r="2.5"/>
+                <circle cx="18.5" cy="18.5" r="2.5"/>
+              </svg>
+              Bus Fleet Status ({busData.length} buses)
+            </h2>
+            
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))',
+              gap: '16px'
+            }}>
+              {busData.map(bus => (
+                <div key={bus.id} style={{
+                  background: '#0f172a',
+                  border: `1px solid ${bus.held ? '#ef4444' : '#334155'}`,
+                  borderRadius: '12px',
+                  padding: '16px'
+                }}>
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    marginBottom: '12px'
+                  }}>
+                    <h3 style={{
+                      fontSize: '16px',
+                      fontWeight: '600',
+                      color: '#f1f5f9',
+                      margin: 0
+                    }}>
+                      {bus.id}
+                    </h3>
+                    {bus.held && (
+                      <span style={{
+                        padding: '4px 8px',
+                        background: '#ef444420',
+                        color: '#ef4444',
+                        borderRadius: '6px',
+                        fontSize: '12px',
+                        fontWeight: '600'
+                      }}>
+                        HELD
+                      </span>
+                    )}
+                  </div>
+                  
+                  <div style={{ fontSize: '14px', color: '#94a3b8', marginBottom: '8px' }}>
+                    Driver: {bus.driver}
+                  </div>
+                  <div style={{ fontSize: '14px', color: '#94a3b8', marginBottom: '8px' }}>
+                    Route: {bus.route}
+                  </div>
+                  <div style={{ fontSize: '14px', color: '#94a3b8', marginBottom: '8px' }}>
+                    Passengers: {bus.passengers}/{bus.capacity}
+                  </div>
+                  <div style={{ fontSize: '14px', color: '#94a3b8', marginBottom: '8px' }}>
+                    ETA: {bus.eta_minutes} min ({bus.distance_km} km)
+                  </div>
+                  <div style={{ fontSize: '14px', color: '#94a3b8' }}>
+                    Speed: {bus.speed_kmh} km/h
+                  </div>
+                  
+                  {bus.alert_message && (
+                    <div style={{
+                      marginTop: '12px',
+                      padding: '8px',
+                      background: `${bus.alert_status === 'hold' ? '#ef4444' : '#f59e0b'}20`,
+                      color: bus.alert_status === 'hold' ? '#ef4444' : '#f59e0b',
+                      borderRadius: '6px',
+                      fontSize: '12px'
+                    }}>
+                      {bus.alert_message}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </main>
-    </div>
-  )
-}
 
-// ── Sub-components ─────────────────────────────────────────────────────────────
-function Metric({ label, value, sub, accent = 'neutral' }) {
-  const colors = { red: 'text-red-400', amber: 'text-amber-400', green: 'text-green-400', neutral: 'text-white' }
-  return (
-    <div className="bg-gray-900 rounded-xl p-3.5">
-      <p className="text-xs text-gray-500 uppercase tracking-wide truncate">{label}</p>
-      <p className={`text-xl font-bold font-mono mt-1 ${colors[accent]}`}>{value}</p>
-      <p className="text-xs text-gray-600 mt-0.5 truncate">{sub}</p>
+      {/* Alert Reply Modal */}
+      {alertReplyModal && (
+        <AlertReplyModal
+          alert={alertReplyModal}
+          agency={auth}
+          token={auth.token}
+          onClose={() => setAlertReplyModal(null)}
+          onReplied={handleAlertReplied}
+        />
+      )}
+
+      {/* PDF Viewer */}
+      {pdfViewer && (
+        <PDFViewer
+          alertId={pdfViewer}
+          onClose={() => setPdfViewer(null)}
+        />
+      )}
+
+      {/* Mobile responsive styles */}
+      <style jsx>{`
+        @media (max-width: 768px) {
+          header div[style*="display: flex"] {
+            flex-wrap: wrap;
+            gap: 8px;
+          }
+          
+          header button[style*="display: none"] {
+            display: flex !important;
+          }
+          
+          main div[style*="gridTemplateColumns"] {
+            grid-template-columns: 1fr !important;
+          }
+          
+          div[style*="flex-wrap: wrap"] {
+            flex-direction: column;
+          }
+          
+          div[style*="minWidth: '120px'"] {
+            min-width: auto !important;
+          }
+        }
+      `}</style>
     </div>
   )
 }
