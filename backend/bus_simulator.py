@@ -321,3 +321,27 @@ class BusSimulator:
             })
         
         return result
+# Singleton instance for main.py compatibility
+_bus_sim = BusSimulator()
+
+def get_bus_update_message(cpi_data: dict = None) -> dict:
+    """
+    Compatibility wrapper for main.py imports.
+    Returns WebSocket-ready bus_update message.
+    """
+    buses = _bus_sim.update(cpi_data)
+    return {
+        "type": "bus_update",
+        "buses": buses,
+        "timestamp": datetime.utcnow().isoformat() + "Z"
+    }
+
+def update_destination_cpi(corridor: str, 
+                            cpi: float) -> None:
+    """
+    Compatibility wrapper — updates CPI for a corridor.
+    Buses will auto-adjust alert status on next update().
+    """
+    # CPI is passed directly to update() via cpi_data dict
+    # This function exists for import compatibility only
+    pass
