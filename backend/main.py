@@ -8,7 +8,7 @@ import csv
 import io
 import os
 from datetime import datetime, timezone
-from typing import Set
+from typing import Any, Dict, Optional, Set
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -19,6 +19,13 @@ import uvicorn
 from simulator import get_all_readings, get_corridor_reading, get_corridors, get_corridor_config
 from database import init_db, insert_alert, ack_alert, get_alerts, log_cpi, get_events
 from replay_data import REPLAY_FRAMES
+
+# ── ML predictor (optional — graceful if models not yet trained) ──────────────
+try:
+    from ml.predictor import predict as ml_predict, load_models, model_info
+    _ML_AVAILABLE = True
+except ImportError:
+    _ML_AVAILABLE = False
 
 # ── App ───────────────────────────────────────────────────────────────────────
 app = FastAPI(title="TS-11 Stampede Predictor", version="2.0.0")
@@ -90,6 +97,12 @@ async def _broadcast_loop():
 async def startup():
     await init_db()
     asyncio.create_task(_broadcast_loop())
+    # Pre-load ML models so first request has no cold-start latency
+    if _ML_AVAILABLE:
+        try:
+            load_models()
+        except FileNotFoundError:
+            print("[main] ML models not yet trained — run `python -m ml.train` to enable /api/ml/predict")
 
 
 # ── Health ────────────────────────────────────────────────────────────────────
@@ -178,6 +191,59 @@ async def replay_frame(frame: int = 0):
 @app.get("/api/replay/all")
 async def replay_all():
     return {"frames": REPLAY_FRAMES, "total": len(REPLAY_FRAMES)}
+
+
+# ── ML Prediction ────────────────────────────────────────────────────────────
+class MLPredictRequest(BaseModel):
+    location: Optional[str] = "Ambaji"
+    corridor_width_m: Optional[float] = 5.0
+    entry_flow_rate_pax_per_min: Optional[float] = 100.0
+    exit_flow_rate_pax_per_min: Optional[float] = 100.0
+    transport_arrival_burst: Optional[int] = 0
+    vehicle_count: Optional[int] = 5
+    queue_density_pax_per_m2: Optional[float] = 2.0
+    weather: Optional[str] = "Clear"
+    festival_peak: Optional[int] = 0
+    pressure_index: Optional[float] = 30.0
+    predicted_crush_window_min: Optional[int] = 15
+
+
+@app.post("/api/ml/predict")
+async def ml_predict_endpoint(body: MLPredictRequest):
+    """
+    Predict crowd crush risk level using the trained XGBoost model.
+
+    Returns:
+      prediction   : SAFE | SURGE | HIGH_RISK
+      confidence   : probability of the predicted class
+      probabilities: breakdown for all 3 classes
+    """
+    if not _ML_AVAILABLE:
+        raise HTTPException(
+            status_code=503,
+            detail="ML module is unavailable. Check that scikit-learn and xgboost are installed.",
+        )
+    try:
+        result = ml_predict(body.model_dump())
+    except FileNotFoundError as exc:
+        raise HTTPException(
+            status_code=503,
+            detail=str(exc) + " — run `python -m ml.train` to train the model first.",
+        )
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Prediction failed: {exc}")
+    return result
+
+
+@app.get("/api/ml/info")
+async def ml_info_endpoint():
+    """Return metadata about the loaded ML model."""
+    if not _ML_AVAILABLE:
+        raise HTTPException(status_code=503, detail="ML module unavailable.")
+    try:
+        return model_info()
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=503, detail=str(exc))
 
 
 # ── Entry point ───────────────────────────────────────────────────────────────
