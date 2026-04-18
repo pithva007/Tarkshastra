@@ -6,8 +6,10 @@ services:
     buildCommand: pip install -r requirements.txt
     startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
     envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.9
       - key: FRONTEND_URL
-        value: https://ts11-frontend.onrender.com
+        value: https://frontend-bnr9.onrender.com
 
   - type: static
     name: ts11-frontend
@@ -16,6 +18,6 @@ services:
     staticPublishPath: dist
     envVars:
       - key: VITE_WS_URL
-        value: wss://ts11-backend.onrender.com/ws
+        value: wss://backend-3px5.onrender.com/ws
       - key: VITE_API_URL
-        value: https://ts11-backend.onrender.com
+        value: https://backend-3px5.onrender.com

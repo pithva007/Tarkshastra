@@ -33,7 +33,7 @@ app = FastAPI(title="TS-11 Stampede Predictor", version="2.0.0")
 _frontend = os.getenv("FRONTEND_URL", "*")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[_frontend, "http://localhost:5173", "http://localhost:4173", "*"],
+    allow_origins=[_frontend, "http://localhost:5173", "http://localhost:4173","https://frontend-bnr9.onrender.com", "*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
