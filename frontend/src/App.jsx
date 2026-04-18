@@ -105,10 +105,9 @@ export default function App() {
       <header className="bg-gray-900 border-b border-gray-800 sticky top-0 z-40">
         <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between gap-4">
           <div className="flex items-center gap-3 min-w-0">
-            <span className="text-xl flex-shrink-0">🔮</span>
             <div className="min-w-0">
               <h1 className="text-sm font-bold text-white tracking-wide truncate">
-                Stampede Window Predictor — TS-11
+                Stampede Window Predictor
                 {agency && (
                   <span className="ml-2 text-amber-400">
                     [{AGENCY_LABELS[agency] || agency}]
