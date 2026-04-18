@@ -8,3 +8,4 @@ python-multipart
 scikit-learn
 joblib
 twilio
+reportlab

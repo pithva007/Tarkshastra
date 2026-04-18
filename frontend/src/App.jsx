@@ -116,6 +116,7 @@ export default function App() {
   const [tab,              setTab]             = useState('Dashboard')
   const [selectedCorridor, setSelectedCorridor] = useState('Ambaji')
   const [backendOk,        setBackendOk]        = useState(null)
+  const [mobileMenuOpen,   setMobileMenuOpen]   = useState(false)
 
   const { corridorData, corridorHistory, connectionStatus, retryCount, busData } = useWebSocket()
 
@@ -209,7 +210,7 @@ export default function App() {
 
       {/* ── Header ── */}
       <header className="bg-gray-900 border-b border-gray-800 sticky top-0 z-40">
-        <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between gap-4">
+        <div className="max-w-7xl mx-auto px-4 md:px-8 py-3 flex items-center justify-between gap-4">
           <div className="flex items-center gap-3 min-w-0">
             <div className="min-w-0">
               <h1 className="text-sm font-bold text-white tracking-wide truncate">
@@ -241,6 +242,18 @@ export default function App() {
               onMarkAllRead={markAllRead}
             />
 
+            {/* Mobile hamburger menu */}
+            <button
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              className="md:hidden p-2 rounded-lg hover:bg-gray-800 transition-colors"
+            >
+              <div className="w-5 h-5 flex flex-col justify-center space-y-1">
+                <div className="w-full h-0.5 bg-white"></div>
+                <div className="w-full h-0.5 bg-white"></div>
+                <div className="w-full h-0.5 bg-white"></div>
+              </div>
+            </button>
+
             {!agency && (
               <div className="hidden md:flex gap-1">
                 {AGENCIES.map((ag) => (
@@ -269,6 +282,52 @@ export default function App() {
             </button>
           </div>
         </div>
+
+        {/* Mobile menu overlay */}
+        {mobileMenuOpen && (
+          <div className="md:hidden fixed inset-0 bg-gray-900 z-50 flex flex-col">
+            <div className="flex items-center justify-between p-4 border-b border-gray-700">
+              <h2 className="text-lg font-bold text-white">Menu</h2>
+              <button
+                onClick={() => setMobileMenuOpen(false)}
+                className="p-2 rounded-lg hover:bg-gray-800 text-white text-xl"
+              >
+                ×
+              </button>
+            </div>
+            <div className="flex-1 p-4 space-y-4">
+              {!agency && (
+                <div className="space-y-2">
+                  <h3 className="text-sm font-bold text-gray-400 uppercase">Agencies</h3>
+                  {AGENCIES.map((ag) => (
+                    <a key={ag} href={`?agency=${ag}`}
+                      onClick={() => setMobileMenuOpen(false)}
+                      className="block px-4 py-3 rounded bg-gray-800 hover:bg-gray-700 text-white capitalize">
+                      {AGENCY_LABELS[ag] || ag}
+                    </a>
+                  ))}
+                </div>
+              )}
+              <div className="space-y-2">
+                <h3 className="text-sm font-bold text-gray-400 uppercase">Navigation</h3>
+                <button
+                  onClick={() => { setTab('Compare'); setMobileMenuOpen(false); }}
+                  className="block w-full text-left px-4 py-3 rounded bg-indigo-900 hover:bg-indigo-800 text-indigo-300"
+                >
+                  Compare All Corridors
+                </button>
+                {auth.token && (
+                  <button
+                    onClick={() => { handleLogout(); setMobileMenuOpen(false); }}
+                    className="block w-full text-left px-4 py-3 rounded bg-red-900 hover:bg-red-800 text-red-300"
+                  >
+                    Logout
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Tabs */}
         <div className="max-w-7xl mx-auto px-4 flex overflow-x-auto">

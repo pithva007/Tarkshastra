@@ -1,7 +1,10 @@
 import { useState, useRef, useEffect } from 'react'
 
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
+
 /**
  * NotificationBell — bell icon with badge + dropdown list of notifications.
+ * Now supports PDF notifications with "Open Report" button.
  *
  * Props:
  *   notifications  — array from useNotifications hook
@@ -73,27 +76,75 @@ export default function NotificationBell({
               </div>
             ) : (
               notifications.slice(0, 10).map((n) => (
-                <button
-                  key={n.id}
-                  onClick={() => { onMarkRead?.(n.id); }}
-                  className={`w-full text-left px-4 py-3 border-b border-gray-800 hover:bg-gray-800 transition-colors ${
-                    !n.read ? 'bg-gray-800/60' : ''
-                  }`}
-                >
-                  <div className="flex items-start gap-2">
-                    {!n.read && (
-                      <span className={`mt-1 w-2 h-2 rounded-full flex-shrink-0 ${
-                        n.critical ? 'bg-red-500' : 'bg-amber-400'
-                      }`} />
-                    )}
-                    <div className={!n.read ? '' : 'ml-4'}>
-                      <p className="text-xs text-white leading-snug">{n.message}</p>
-                      <p className="text-xs text-gray-500 mt-1">
-                        {n.corridor} · {new Date(n.timestamp).toLocaleTimeString()}
-                      </p>
+                <div key={n.id}>
+                  {/* PDF Ready Notification */}
+                  {n.type === 'pdf_ready' && (
+                    <div style={{
+                      background: '#1e293b',
+                      border: '1px solid #ef4444',
+                      borderRadius: 8,
+                      padding: '12px',
+                      margin: '8px',
+                      marginBottom: 8
+                    }}>
+                      <div style={{
+                        color: '#ef4444',
+                        fontWeight: 600,
+                        fontSize: 13,
+                        marginBottom: 6
+                      }}>
+                        📄 Incident Report Ready
+                      </div>
+                      <div style={{
+                        color: '#94a3b8',
+                        fontSize: 12,
+                        marginBottom: 8
+                      }}>
+                        {n.corridor} — {n.message}
+                      </div>
+                      <button
+                        onClick={() => window.open(`${API_URL}${n.pdf_url}`, '_blank')}
+                        style={{
+                          background: '#dc2626',
+                          color: 'white',
+                          border: 'none',
+                          borderRadius: 6,
+                          padding: '6px 14px',
+                          fontSize: 12,
+                          fontWeight: 600,
+                          cursor: 'pointer',
+                          width: '100%'
+                        }}
+                      >
+                        Open PDF Report →
+                      </button>
                     </div>
-                  </div>
-                </button>
+                  )}
+                  
+                  {/* Regular Notification */}
+                  {n.type !== 'pdf_ready' && (
+                    <button
+                      onClick={() => { onMarkRead?.(n.id); }}
+                      className={`w-full text-left px-4 py-3 border-b border-gray-800 hover:bg-gray-800 transition-colors ${
+                        !n.read ? 'bg-gray-800/60' : ''
+                      }`}
+                    >
+                      <div className="flex items-start gap-2">
+                        {!n.read && (
+                          <span className={`mt-1 w-2 h-2 rounded-full flex-shrink-0 ${
+                            n.critical ? 'bg-red-500' : 'bg-amber-400'
+                          }`} />
+                        )}
+                        <div className={!n.read ? '' : 'ml-4'}>
+                          <p className="text-xs text-white leading-snug">{n.message}</p>
+                          <p className="text-xs text-gray-500 mt-1">
+                            {n.corridor} · {new Date(n.timestamp).toLocaleTimeString()}
+                          </p>
+                        </div>
+                      </div>
+                    </button>
+                  )}
+                </div>
               ))
             )}
           </div>

@@ -12,11 +12,12 @@ import os
 import random
 import uuid
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any, Dict, List, Optional, Set
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import StreamingResponse
+from fastapi.responses import StreamingResponse, FileResponse
 from pydantic import BaseModel
 import uvicorn
 
@@ -28,6 +29,7 @@ from database import (
     get_historical_incidents, log_call, get_call_log,
 )
 from call_service import trigger_corridor_calls, make_alert_call
+from report_generator import generate_alert_report
 from replay_data import REPLAY_FRAMES
 from bus_simulator import get_bus_update_message, update_destination_cpi
 from historical import get_historical_for_corridor, get_seasonal_prediction
@@ -281,6 +283,10 @@ async def run_simulator():
                                 ttb_minutes=reading.get("time_to_breach_minutes") or 0,
                                 surge_type=reading["surge_type"],
                                 alert_id=reading["alert_id"],
+                                flow_rate=reading.get("flow_rate", 1200),
+                                transport_burst=reading.get("transport_burst", 0.6),
+                                chokepoint_density=reading.get("chokepoint_density", 0.7),
+                                ml_confidence=reading.get("ml_confidence", 85)
                             )
                         )
 
@@ -547,6 +553,36 @@ async def simulate_endpoint(body: SimulateBody):
 
 # ── Incident Report ───────────────────────────────────────────────────────────
 @app.get("/api/report/{alert_id}")
+async def get_report_pdf(alert_id: str):
+    """Download PDF report for an alert."""
+    pdf_path = f"reports/alert_{alert_id}.pdf"
+    if not os.path.exists(pdf_path):
+        return {"error": "Report not found", "alert_id": alert_id}
+    return FileResponse(
+        path=pdf_path,
+        media_type="application/pdf",
+        filename=f"incident_report_{alert_id}.pdf"
+    )
+
+@app.get("/api/reports")
+async def list_reports():
+    """List all generated reports."""
+    reports_dir = Path("reports")
+    if not reports_dir.exists():
+        return []
+    files = list(reports_dir.glob("*.pdf"))
+    return [
+        {
+            "filename": f.name,
+            "alert_id": f.stem.replace("alert_", ""),
+            "url": f"/api/report/{f.stem.replace('alert_','')}",
+            "size_kb": round(f.stat().st_size / 1024, 1),
+            "created_at": datetime.fromtimestamp(f.stat().st_ctime).isoformat()
+        }
+        for f in sorted(files, key=lambda x: x.stat().st_ctime, reverse=True)
+    ]
+
+@app.get("/api/report/{alert_id}")
 async def get_report(alert_id: str):
     alert = await get_alert_by_id(alert_id)
     if not alert:
@@ -663,8 +699,45 @@ async def trigger_calls_and_log(
     ttb_minutes: float,
     surge_type: str,
     alert_id: str,
+    flow_rate: float = 1200,
+    transport_burst: float = 0.6,
+    chokepoint_density: float = 0.7,
+    ml_confidence: int = 85
 ):
-    """Background task: trigger calls and log results to DB + broadcast."""
+    """Background task: generate PDF, trigger calls and log results to DB + broadcast."""
+    
+    # Generate PDF report first
+    pdf_path = None
+    try:
+        loop = asyncio.get_event_loop()
+        pdf_path = await loop.run_in_executor(
+            None,
+            lambda: generate_alert_report(
+                alert_id=alert_id,
+                corridor=corridor,
+                cpi=cpi,
+                flow_rate=flow_rate,
+                transport_burst=transport_burst,
+                chokepoint_density=chokepoint_density,
+                surge_type=surge_type,
+                ttb_minutes=ttb_minutes,
+                ml_confidence=ml_confidence
+            )
+        )
+        print(f"[PDF] Ready: {pdf_path}")
+    except Exception as e:
+        print(f"[PDF ERROR] {e}")
+
+    # Broadcast PDF ready notification
+    await manager.broadcast({
+        "type": "pdf_ready",
+        "alert_id": alert_id,
+        "corridor": corridor,
+        "pdf_url": f"/api/report/{alert_id}",
+        "message": f"Incident report ready for {corridor}. Tap to open."
+    })
+
+    # Then make calls (mentions PDF in message)
     results = trigger_corridor_calls(
         corridor=corridor,
         cpi=cpi,

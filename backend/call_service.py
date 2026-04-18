@@ -21,32 +21,40 @@ except ImportError:
 last_called: dict = {}
 COOLDOWN_SECONDS = 300  # 5 minutes
 
+# Demo numbers for hackathon - 3 hardcoded numbers from environment
+DEMO_NUMBERS = {
+    "police": os.getenv("DEMO_POLICE_NUMBER", ""),
+    "temple": os.getenv("DEMO_TEMPLE_NUMBER", ""),
+    "gsrtc":  os.getenv("DEMO_GSRTC_NUMBER", ""),
+    "driver": os.getenv("DEMO_DRIVER_NUMBER", ""),
+}
+
 # Pre-registered numbers per role per corridor
-# In production these come from DB — for hackathon hardcoded
+# In production these come from DB — for hackathon use demo numbers
 REGISTERED_NUMBERS = {
     "police": {
-        "Ambaji":   os.getenv("POLICE_AMBAJI_NUMBER", ""),
-        "Dwarka":   os.getenv("POLICE_DWARKA_NUMBER", ""),
-        "Somnath":  os.getenv("POLICE_SOMNATH_NUMBER", ""),
-        "Pavagadh": os.getenv("POLICE_PAVAGADH_NUMBER", ""),
+        "Ambaji":   DEMO_NUMBERS["police"],
+        "Dwarka":   DEMO_NUMBERS["police"],
+        "Somnath":  DEMO_NUMBERS["police"],
+        "Pavagadh": DEMO_NUMBERS["police"],
     },
     "temple": {
-        "Ambaji":   os.getenv("TEMPLE_AMBAJI_NUMBER", ""),
-        "Dwarka":   os.getenv("TEMPLE_DWARKA_NUMBER", ""),
-        "Somnath":  os.getenv("TEMPLE_SOMNATH_NUMBER", ""),
-        "Pavagadh": os.getenv("TEMPLE_PAVAGADH_NUMBER", ""),
+        "Ambaji":   DEMO_NUMBERS["temple"],
+        "Dwarka":   DEMO_NUMBERS["temple"],
+        "Somnath":  DEMO_NUMBERS["temple"],
+        "Pavagadh": DEMO_NUMBERS["temple"],
     },
     "gsrtc": {
-        "Ambaji":   os.getenv("GSRTC_AMBAJI_NUMBER", ""),
-        "Dwarka":   os.getenv("GSRTC_DWARKA_NUMBER", ""),
-        "Somnath":  os.getenv("GSRTC_SOMNATH_NUMBER", ""),
-        "Pavagadh": os.getenv("GSRTC_PAVAGADH_NUMBER", ""),
+        "Ambaji":   DEMO_NUMBERS["gsrtc"],
+        "Dwarka":   DEMO_NUMBERS["gsrtc"],
+        "Somnath":  DEMO_NUMBERS["gsrtc"],
+        "Pavagadh": DEMO_NUMBERS["gsrtc"],
     },
     "driver": {
-        "Ambaji":   os.getenv("DRIVER_AMBAJI_NUMBER", ""),
-        "Dwarka":   os.getenv("DRIVER_DWARKA_NUMBER", ""),
-        "Somnath":  os.getenv("DRIVER_SOMNATH_NUMBER", ""),
-        "Pavagadh": os.getenv("DRIVER_PAVAGADH_NUMBER", ""),
+        "Ambaji":   DEMO_NUMBERS["driver"],
+        "Dwarka":   DEMO_NUMBERS["driver"],
+        "Somnath":  DEMO_NUMBERS["driver"],
+        "Pavagadh": DEMO_NUMBERS["driver"],
     },
 }
 
@@ -69,6 +77,8 @@ def build_message(
             f"Genuine crush risk detected at {corridor} corridor. "
             f"Corridor Pressure Index is {cpi_str}. "
             f"Estimated crush in {ttb_str} minutes. "
+            f"Incident report has been sent to your dashboard. "
+            f"Open the alert notification to view the PDF report. "
             f"Deploy officers to Choke Point Bravo immediately. "
             f"Alert ID: {alert_id}. "
             f"This is an automated alert. Please acknowledge on dashboard."
@@ -77,6 +87,7 @@ def build_message(
             f"Urgent alert from Stampede Predictor System. "
             f"High crowd pressure at {corridor} temple. "
             f"Pressure Index {cpi_str}. Crush risk in {ttb_str} minutes. "
+            f"PDF report sent to your dashboard. "
             f"Activate darshan hold at inner gate immediately. "
             f"Redirect pilgrims to Queue Charlie. "
             f"Alert ID: {alert_id}."
@@ -85,6 +96,7 @@ def build_message(
             f"Urgent alert from Stampede Predictor System. "
             f"{corridor} corridor is at critical capacity. "
             f"Pressure Index {cpi_str}. "
+            f"Incident report sent to your dashboard. "
             f"Hold all incoming buses at the 3 kilometre checkpoint now. "
             f"Do not dispatch additional vehicles until further notice. "
             f"Alert ID: {alert_id}."
@@ -94,7 +106,9 @@ def build_message(
             f"has critical crowd pressure. Pressure Index {cpi_str}. "
             f"Stop at the designated checkpoint immediately. "
             f"Do not proceed to temple area. "
+            f"Check your dashboard for full report. "
             f"Await instructions from control room. "
+            f"Alert ID: {alert_id}. "
             f"This is an automated safety alert."
         ),
     }

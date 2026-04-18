@@ -6,9 +6,11 @@
 .Trashes
 ehthumbs.db
 Thumbs.db
+/crowd_counter
 
 # IDEs and Editors
 .vscode/
 .idea/
 *.swp
 *.swo
+

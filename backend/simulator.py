@@ -1,17 +1,19 @@
 """
-CPI (Corridor Pressure Index) simulation engine.
+CPI (Corridor Pressure Index) simulation engine with realistic state machine.
+
+Each corridor has a STATE:
+- NORMAL    → CPI slowly varies 0.2 to 0.5
+- BUILDING  → CPI rising 0.5 to 0.75 over 3-5 minutes
+- SURGE     → CPI stays HIGH 0.75 to 0.92 for 8-15 minutes
+- RESOLVING → CPI slowly drops back to normal over 3-5 minutes
 
 Baseline values are derived from TS-PS11.csv at startup.
-
-Formula:
-  CPI = (flow_rate / capacity_ppm) * 0.5
-      + transport_burst_factor * 0.3
-      + chokepoint_density * 0.2
 """
 import os
 import time
 import uuid
 import random
+import math
 from collections import deque
 from datetime import datetime, timezone
 from typing import Dict, List, Optional, Tuple
@@ -79,13 +81,98 @@ def _get_ml_predict():
     return _ml_predict_fn
 
 
-# ── Phase state machine ────────────────────────────────────────────────────────
-_PHASE_TRANSITIONS = {
-    "normal":          (["normal", "surge"],              [0.70, 0.30]),
-    "surge":           (["critical", "surge_resolving"],  [0.40, 0.60]),
-    "critical":        (["surge_resolving", "normal"],    [0.70, 0.30]),
-    "surge_resolving": (["normal"],                       [1.00]),
+# ── Corridor state machine for realistic CPI simulation ──────────────────────
+CORRIDOR_STATES = {}  # corridor_name → state dict
+
+def init_corridor_state(corridor):
+    """Initialize corridor state with random phase offset."""
+    return {
+        "state": "NORMAL",
+        "cpi": random.uniform(0.2, 0.4),
+        "state_entered_at": time.time(),
+        "state_duration": random.uniform(600, 1200),  # 10-20 minutes in normal
+        "target_cpi": random.uniform(0.2, 0.4),
+        "phase_offset": random.uniform(0, 6.28)
+    }
+
+def update_cpi(corridor_name, state_dict):
+    """Update CPI based on current state.
+    Called every 2 seconds.
+    Returns new CPI value."""
+    state = state_dict["state"]
+    elapsed = time.time() - state_dict["state_entered_at"]
+    duration = state_dict["state_duration"]
+    progress = min(elapsed / duration, 1.0)
+    
+    if state == "NORMAL":
+        # Gentle sine wave variation 0.2-0.5
+        base = 0.35
+        variation = 0.12
+        cpi = base + variation * math.sin(time.time() * 0.05 + state_dict["phase_offset"])
+        
+        # Trigger BUILDING randomly
+        if elapsed > duration:
+            state_dict["state"] = "BUILDING"
+            state_dict["state_entered_at"] = time.time()
+            state_dict["state_duration"] = random.uniform(180, 300)  # 3-5 minutes
+            state_dict["target_cpi"] = random.uniform(0.78, 0.92)
+            print(f"[SURGE STARTING] {corridor_name} → BUILDING")
+            
+    elif state == "BUILDING":
+        # CPI rises linearly toward target
+        start_cpi = 0.45
+        cpi = start_cpi + (state_dict["target_cpi"] - start_cpi) * progress
+        # Add small noise
+        cpi += random.uniform(-0.02, 0.02)
+        
+        if progress >= 1.0:
+            state_dict["state"] = "SURGE"
+            state_dict["state_entered_at"] = time.time()
+            state_dict["state_duration"] = random.uniform(480, 900)  # 8-15 minutes
+            print(f"[SURGE ACTIVE] {corridor_name} → SURGE")
+            
+    elif state == "SURGE":
+        # CPI stays high with small fluctuations
+        peak = state_dict["target_cpi"]
+        cpi = peak + random.uniform(-0.04, 0.04)
+        cpi = max(0.75, min(0.95, cpi))
+        
+        if progress >= 1.0:
+            state_dict["state"] = "RESOLVING"
+            state_dict["state_entered_at"] = time.time()
+            state_dict["state_duration"] = random.uniform(180, 300)  # 3-5 minutes
+            print(f"[RESOLVING] {corridor_name} → RESOLVING")
+            
+    elif state == "RESOLVING":
+        # CPI drops back to normal
+        start_cpi = state_dict["target_cpi"]
+        end_cpi = random.uniform(0.2, 0.4)
+        cpi = start_cpi + (end_cpi - start_cpi) * progress
+        cpi += random.uniform(-0.02, 0.02)
+        
+        if progress >= 1.0:
+            state_dict["state"] = "NORMAL"
+            state_dict["state_entered_at"] = time.time()
+            state_dict["state_duration"] = random.uniform(600, 1200)  # 10-20 minutes
+            print(f"[NORMAL] {corridor_name} → NORMAL")
+    
+    state_dict["cpi"] = round(max(0.1, min(0.98, cpi)), 3)
+    return state_dict["cpi"]
+
+# Initialize all 4 corridors at startup with different phase offsets
+CORRIDOR_STATES = {
+    "Ambaji":   init_corridor_state("Ambaji"),
+    "Dwarka":   init_corridor_state("Dwarka"),
+    "Somnath":  init_corridor_state("Somnath"),
+    "Pavagadh": init_corridor_state("Pavagadh"),
 }
+
+# Force different starting states for demo variety
+CORRIDOR_STATES["Ambaji"]["state_duration"] = 300
+CORRIDOR_STATES["Dwarka"]["state_entered_at"] = time.time() - 500
+CORRIDOR_STATES["Pavagadh"]["state"] = "BUILDING"
+CORRIDOR_STATES["Pavagadh"]["state_entered_at"] = time.time() - 120
+CORRIDOR_STATES["Pavagadh"]["target_cpi"] = 0.88
 
 
 class CorridorSimulator:
@@ -95,31 +182,25 @@ class CorridorSimulator:
         self.cpi_history: deque = deque(maxlen=10)
         self.step = 0
         self.consecutive_high = 0
-        self._phase = "normal"
-        self._phase_timer = 0
-        self._phase_duration = random.randint(50, 100)
         self._active_alert_id: Optional[str] = None
 
     def tick(self) -> dict:
         self.step += 1
-        self._advance_phase()
-
-        flow_rate  = self._sim_flow()
-        transport  = self._sim_transport()
-        density    = self._sim_density()
-
-        norm_flow    = min(flow_rate / self.baseline["capacity_ppm"], 1.0)
-        norm_density = min(density / DENSITY_DANGER_THRESHOLD, 1.0)
-
-        cpi = norm_flow * 0.5 + transport * 0.3 + norm_density * 0.2
-        cpi = float(np.clip(cpi + np.random.normal(0, 0.007), 0.0, 1.0))
+        
+        # Use realistic state machine for CPI
+        cpi = update_cpi(self.name, CORRIDOR_STATES[self.name])
+        
+        # Generate other metrics based on CPI
+        flow_rate = self._sim_flow(cpi)
+        transport = self._sim_transport(cpi)
+        density = self._sim_density(cpi)
 
         self.cpi_history.append(cpi)
         self.consecutive_high = (self.consecutive_high + 1) if cpi > 0.70 else 0
 
-        slope   = self._slope()
-        ttb_s   = self._ttb_seconds(cpi, slope)
-        surge   = self._classify(cpi, slope, ttb_s)
+        slope = self._slope()
+        ttb_s = self._ttb_seconds(cpi, slope)
+        surge = self._classify(cpi, slope, ttb_s)
         alert_active, alert_id = self._manage_alert(surge)
 
         # ── ML confidence enrichment ──────────────────────────────────────────
@@ -132,7 +213,7 @@ class CorridorSimulator:
                     "cpi":               cpi,
                     "flow_rate":         flow_rate,
                     "transport_burst":   transport,
-                    "chokepoint_density": norm_density,
+                    "chokepoint_density": density,
                     "cpi_slope":         slope,
                     "cpi_history":       list(self.cpi_history),
                 })
@@ -141,50 +222,51 @@ class CorridorSimulator:
             except Exception:
                 pass
 
+        # Add corridor state info to broadcast
+        state_dict = CORRIDOR_STATES[self.name]
+        state_duration_remaining = max(0, int(state_dict["state_duration"] - (time.time() - state_dict["state_entered_at"])))
+
         return {
             "type":                   "cpi_update",
             "corridor":               self.name,
             "cpi":                    round(cpi, 3),
             "flow_rate":              round(flow_rate, 1),
             "transport_burst":        round(transport, 3),
-            "chokepoint_density":     round(norm_density, 3),
+            "chokepoint_density":     round(density, 3),
             "surge_type":             surge,
             "time_to_breach_seconds": round(ttb_s, 1) if ttb_s is not None else None,
             "alert_active":           alert_active,
             "alert_id":               alert_id,
-            "phase":                  self._phase,
+            "corridor_state":         state_dict["state"],
+            "state_duration_remaining": state_duration_remaining,
             "consecutive_high":       self.consecutive_high,
             "ml_confidence":          ml_confidence,
             "ml_risk_level":          ml_risk_level,
             "timestamp":              datetime.now(timezone.utc).isoformat(),
         }
 
-    def _advance_phase(self):
-        self._phase_timer += 1
-        if self._phase_timer < self._phase_duration:
-            return
-        self._phase_timer    = 0
-        self._phase_duration = random.randint(20, 60)
-        phases, weights = _PHASE_TRANSITIONS.get(self._phase, (["normal"], [1.0]))
-        self._phase = random.choices(phases, weights=weights)[0]
+    def _sim_flow(self, cpi: float) -> float:
+        """Generate flow rate based on CPI."""
+        base = self.baseline["mean_flow"]
+        # Higher CPI = higher flow rate
+        multiplier = 1.0 + (cpi - 0.3) * 2.0
+        flow = base * max(0.5, multiplier)
+        noise = np.random.normal(0, base * 0.04)
+        return float(max(10.0, flow + noise))
 
-    def _sim_flow(self) -> float:
-        b    = self.baseline
-        mult = {"normal": 1.05, "surge": 1.55, "critical": 2.0, "surge_resolving": 1.15}
-        base = b["mean_flow"] * mult.get(self._phase, 1.0)
-        base += 0.08 * b["capacity_ppm"] * np.sin(self.step * 0.12)
-        noise = np.random.normal(0, b["mean_flow"] * 0.04)
-        return float(max(10.0, base + noise))
-
-    def _sim_transport(self) -> float:
-        b    = {"normal": 0.20, "surge": 0.60, "critical": 0.85, "surge_resolving": 0.25}
-        base = b.get(self._phase, 0.20) * (self.baseline["mean_transport"] / 0.30)
+    def _sim_transport(self, cpi: float) -> float:
+        """Generate transport burst based on CPI."""
+        # Higher CPI = higher transport burst
+        base = 0.2 + (cpi - 0.2) * 1.5
         return float(np.clip(base + np.random.normal(0, 0.04), 0.0, 1.0))
 
-    def _sim_density(self) -> float:
-        b    = {"normal": 1.0, "surge": 2.2, "critical": 3.5, "surge_resolving": 1.3}
-        base = self.baseline["mean_density"] * b.get(self._phase, 1.0)
-        return float(max(0.2, base + np.random.normal(0, 0.15)))
+    def _sim_density(self, cpi: float) -> float:
+        """Generate density based on CPI."""
+        base = self.baseline["mean_density"]
+        # Higher CPI = higher density
+        multiplier = 1.0 + (cpi - 0.3) * 3.0
+        density = base * max(0.3, multiplier)
+        return float(max(0.2, density + np.random.normal(0, 0.15)))
 
     def _slope(self) -> float:
         if len(self.cpi_history) < 5:
