@@ -17,6 +17,7 @@ import HistoricalPanel from './components/HistoricalPanel'
 import AlertReplyModal from './components/AlertReplyModal'
 import AdminPanel from './components/AdminPanel'
 import PDFViewer from './components/PDFViewer'
+import VisionUpload from './components/VisionUpload'
 
 const ROLE_COLORS = {
   police: '#3B82F6',
@@ -137,11 +138,35 @@ export default function App() {
           console.log('[CALL UPDATE]', data.corridor, calledRoles)
         }
       }
+
+      if (data.type === 'vision_progress') {
+        console.log('[VISION PROGRESS]', 
+          data.corridor, 
+          data.progress + '%', 
+          'count:', data.live_count)
+      }
+
+      if (data.type === 'vision_complete') {
+        console.log('[VISION COMPLETE]', data.result)
+        // Add notification for vision completion
+        addNotification({
+          id: Date.now(),
+          type: 'vision_complete',
+          corridor: data.corridor,
+          message: data.message,
+          read: false,
+          timestamp: new Date().toISOString()
+        })
+      }
+
+      if (data.type === 'vision_started') {
+        console.log('[VISION STARTED]', data.corridor)
+      }
     }
 
     window.addEventListener('ws_message', handleWSMessage)
     return () => window.removeEventListener('ws_message', handleWSMessage)
-  }, [])
+  }, [addNotification])
 
   // Handle PDF ready notifications
   useEffect(() => {
@@ -524,6 +549,14 @@ export default function App() {
               agency={activeRole}
               corridorData={corridorData}
               selectedCorridor={selectedCorridor}
+            />
+
+            {/* Vision Upload */}
+            <VisionUpload
+              onVisionData={(data) => {
+                console.log('[VISION DATA]', data)
+              }}
+              connectionStatus={connectionStatus}
             />
 
             {/* What-If Simulator */}

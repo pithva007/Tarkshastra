@@ -219,17 +219,32 @@ class CorridorSimulator:
             elif self.state == "RESOLVING":
                 self._transition_to("NORMAL")
         
-        # Add tiny 2-second noise (±1%) so UI feels live
-        # but values don't jump wildly
-        flow_noise = self.current_flow * random.uniform(-0.01, 0.01)
-        live_flow = self.current_flow + flow_noise
+        # Check if vision data is available for this corridor
+        from vision_bridge import get_vision_reading
+        vision = get_vision_reading(self.corridor)
         
-        transport_noise = random.uniform(-0.01, 0.01)
-        live_transport = max(0, min(1, self.current_transport_burst + transport_noise))
+        if vision:
+            # Use real vision-based flow rate
+            live_flow = vision["flow_rate"]
+            # Keep existing transport + chokepoint from sim
+            live_transport = self.current_transport_burst
+            live_chokepoint = self.current_chokepoint
+            data_source = "vision"
+            print(f"[SIM] {self.corridor} using VISION data: "
+                  f"flow={live_flow}")
+        else:
+            # Use simulated flow rate (existing code)
+            flow_noise = self.current_flow * random.uniform(-0.01, 0.01)
+            live_flow = self.current_flow + flow_noise
+            live_transport = self.current_transport_burst + \
+                random.uniform(-0.01, 0.01)
+            live_chokepoint = self.current_chokepoint + \
+                random.uniform(-0.01, 0.01)
+            data_source = "simulation"
         
-        chokepoint_noise = random.uniform(-0.01, 0.01)
-        live_chokepoint = max(0, min(1,
-                                     self.current_chokepoint + chokepoint_noise))
+        # Clamp values
+        live_transport = max(0, min(1, live_transport))
+        live_chokepoint = max(0, min(1, live_chokepoint))
         
         # Compute CPI
         cpi = self._compute_cpi(live_flow, live_transport, live_chokepoint)
@@ -290,7 +305,10 @@ class CorridorSimulator:
             "ml_risk_level": self._get_risk_level(cpi),
             "timestamp": datetime.utcnow().isoformat() + "Z",
             "baseline_flow": round(self.baseline["avg_flow"]),
-            "data_source": self.baseline["source"],
+            "data_source": data_source,
+            "vision_active": vision is not None,
+            "vision_count": vision["live_count"] if vision else None,
+            "vision_age_seconds": vision["age_seconds"] if vision else None,
         }
     
     def _get_ml_confidence(self, cpi: float) -> int:

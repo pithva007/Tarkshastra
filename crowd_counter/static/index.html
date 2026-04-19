@@ -1,0 +1,496 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Crowd Counter — TS-11 Vision Module</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: system-ui, sans-serif; background: #0f172a; color: #e2e8f0; min-height: 100vh; }
+
+    .header {
+      background: #1e293b;
+      border-bottom: 1px solid #334155;
+      padding: 1rem 2rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .header h1 { font-size: 1.25rem; font-weight: 600; color: #f1f5f9; }
+    .header span { font-size: 0.75rem; color: #64748b; margin-left: 0.5rem; }
+
+    .ws-badge { padding: 4px 12px; border-radius: 9999px; font-size: 0.75rem; font-weight: 500; }
+    .ws-connected    { background: #166534; color: #86efac; }
+    .ws-disconnected { background: #7f1d1d; color: #fca5a5; }
+
+    .container { max-width: 1100px; margin: 0 auto; padding: 2rem 1rem; }
+
+    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-bottom: 1.5rem; }
+    @media(max-width: 768px) { .grid { grid-template-columns: 1fr; } }
+
+    .card {
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 12px;
+      padding: 1.5rem;
+    }
+    .card h2 {
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: #64748b;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      margin-bottom: 1rem;
+    }
+
+    .upload-area {
+      border: 2px dashed #334155;
+      border-radius: 8px;
+      padding: 2rem;
+      text-align: center;
+      cursor: pointer;
+      transition: border-color 0.2s;
+    }
+    .upload-area:hover  { border-color: #60a5fa; }
+    .upload-area.dragover { border-color: #60a5fa; background: #1e3a5f; }
+    .upload-icon { font-size: 2.5rem; margin-bottom: 0.5rem; }
+    .upload-text { font-size: 0.9rem; color: #94a3b8; margin-bottom: 0.5rem; }
+    .upload-sub  { font-size: 0.75rem; color: #475569; }
+    input[type="file"] { display: none; }
+
+    .btn {
+      width: 100%;
+      padding: 0.75rem 1.5rem;
+      border-radius: 8px;
+      border: none;
+      font-size: 0.9rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: opacity 0.2s;
+      margin-top: 0.75rem;
+    }
+    .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+    .btn-blue  { background: #2563eb; color: white; }
+    .btn-green { background: #16a34a; color: white; }
+    .btn-gray  { background: #334155; color: #94a3b8; }
+
+    .stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; }
+    .stat { background: #0f172a; border-radius: 8px; padding: 1rem; text-align: center; }
+    .stat-value { font-size: 2rem; font-weight: 700; line-height: 1; }
+    .stat-label { font-size: 0.7rem; color: #64748b; margin-top: 0.25rem; text-transform: uppercase; letter-spacing: 0.05em; }
+
+    .density-badge {
+      display: inline-block;
+      padding: 4px 12px;
+      border-radius: 9999px;
+      font-size: 0.8rem;
+      font-weight: 700;
+      margin-top: 0.5rem;
+    }
+
+    .progress-bar-bg { background: #334155; border-radius: 9999px; height: 8px; overflow: hidden; margin-top: 0.5rem; }
+    .progress-bar    { height: 100%; border-radius: 9999px; background: #2563eb; transition: width 0.3s; }
+
+    .log {
+      background: #0f172a;
+      border-radius: 8px;
+      padding: 1rem;
+      height: 200px;
+      overflow-y: auto;
+      font-family: monospace;
+      font-size: 0.75rem;
+    }
+    .log-entry         { margin-bottom: 0.25rem; color: #94a3b8; }
+    .log-entry.alert   { color: #f87171; }
+    .log-entry.success { color: #86efac; }
+    .log-entry.info    { color: #60a5fa; }
+
+    .chart-container {
+      height: 160px;
+      display: flex;
+      align-items: flex-end;
+      gap: 2px;
+      padding: 0.5rem 0;
+      overflow: hidden;
+    }
+    .chart-bar { flex: 1; border-radius: 2px 2px 0 0; min-width: 3px; transition: height 0.1s; }
+
+    .full-width { grid-column: 1 / -1; }
+
+    .result-table { width: 100%; border-collapse: collapse; }
+    .result-table th,
+    .result-table td {
+      padding: 0.5rem 0.75rem;
+      text-align: left;
+      border-bottom: 1px solid #1e293b;
+      font-size: 0.8rem;
+    }
+    .result-table th { color: #64748b; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; }
+
+    .status-msg { padding: 0.75rem 1rem; border-radius: 8px; font-size: 0.85rem; margin-bottom: 1rem; }
+    .status-info    { background: #1e3a5f; color: #93c5fd; }
+    .status-success { background: #14532d; color: #86efac; }
+    .status-error   { background: #7f1d1d; color: #fca5a5; }
+  </style>
+</head>
+<body>
+
+<div class="header">
+  <div>
+    <h1>Crowd Counter <span>TS-11 Vision Module</span></h1>
+  </div>
+  <span class="ws-badge ws-disconnected" id="wsBadge">Disconnected</span>
+</div>
+
+<div class="container">
+  <div id="statusMsg" class="status-msg status-info" style="display:none;"></div>
+
+  <div class="grid">
+    <!-- Upload Card -->
+    <div class="card">
+      <h2>1 — Upload Video</h2>
+      <div class="upload-area" id="uploadArea" onclick="document.getElementById('fileInput').click()">
+        <div class="upload-icon">🎥</div>
+        <div class="upload-text" id="uploadText">Click or drag video here</div>
+        <div class="upload-sub">MP4, AVI, MOV, MKV supported</div>
+      </div>
+      <input type="file" id="fileInput" accept=".mp4,.avi,.mov,.mkv,.webm">
+
+      <div style="margin-top:0.75rem;">
+        <label style="font-size:0.8rem;color:#94a3b8;">Corridor Capacity (people):</label>
+        <input type="number" id="capacity" value="100" min="10" max="5000"
+          style="width:100%;margin-top:4px;background:#0f172a;border:1px solid #334155;
+                 color:#e2e8f0;border-radius:6px;padding:6px 10px;font-size:0.85rem;">
+      </div>
+
+      <button class="btn btn-blue"  id="uploadBtn"   onclick="uploadVideo()"      disabled>Upload Video</button>
+      <button class="btn btn-green" id="processBtn"  onclick="startProcessing()"  disabled>Start Counting</button>
+      <button class="btn btn-gray"  id="downloadBtn" onclick="downloadOutput()"   disabled>Download Annotated Video</button>
+    </div>
+
+    <!-- Live Stats Card -->
+    <div class="card">
+      <h2>2 — Live Results</h2>
+      <div class="stat-grid" style="grid-template-columns: 1fr 1fr 1fr;">
+        <div class="stat">
+          <div class="stat-value" id="liveCount" style="color:#22c55e;font-size:2.5rem;">0</div>
+          <div class="stat-label">Estimated Count</div>
+          <div class="stat-label">(with occlusion fix)</div>
+        </div>
+        <div class="stat">
+          <div class="stat-value" id="yoloRaw" style="color:#64748b;">0</div>
+          <div class="stat-label">YOLO Raw</div>
+          <div class="stat-label">(visible only)</div>
+        </div>
+        <div class="stat">
+          <div class="stat-value" id="occlusionFactor" style="color:#f59e0b;">1.0x</div>
+          <div class="stat-label">Occlusion Factor</div>
+          <div class="stat-label">(hidden people mult.)</div>
+        </div>
+        <div class="stat">
+          <div class="stat-value" id="cpiValue" style="color:#ef4444;">0.000</div>
+          <div class="stat-label">CPI Score</div>
+          <div class="stat-label">(0=safe, 1=crush)</div>
+        </div>
+        <div class="stat">
+          <div class="stat-value" id="methodBadge" style="color:#60a5fa;font-size:1rem;">-</div>
+          <div class="stat-label">Detection Method</div>
+          <div class="stat-label">yolo/hybrid/density</div>
+        </div>
+        <div class="stat">
+          <div class="stat-value" id="frameNum" style="color:#94a3b8;">0</div>
+          <div class="stat-label">Frame</div>
+          <div class="stat-label">processed</div>
+        </div>
+      </div>
+      <div style="text-align:center;margin-top:0.75rem;">
+        <span class="density-badge" id="densityBadge" style="background:#166534;color:#86efac;">WAITING</span>
+      </div>
+      <div class="progress-bar-bg" style="margin-top:0.75rem;">
+        <div class="progress-bar" id="progressBar" style="width:0%"></div>
+      </div>
+      <div style="text-align:center;font-size:0.75rem;color:#64748b;margin-top:0.25rem;">
+        <span id="progressText">0%</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid">
+    <!-- Live Chart -->
+    <div class="card">
+      <h2>Live Count Chart (last 60 frames)</h2>
+      <div class="chart-container" id="chartContainer"></div>
+    </div>
+
+    <!-- Log -->
+    <div class="card">
+      <h2>Processing Log</h2>
+      <div class="log" id="logBox">
+        <div class="log-entry info">Ready. Upload a video to start.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Final Summary -->
+  <div class="card full-width" id="summaryCard" style="display:none;">
+    <h2>Final Summary</h2>
+    <table class="result-table">
+      <thead>
+        <tr>
+          <th>Metric</th>
+          <th>Value</th>
+          <th>Notes</th>
+        </tr>
+      </thead>
+      <tbody id="summaryTable"></tbody>
+    </table>
+  </div>
+</div>
+
+<script>
+  const API    = 'http://localhost:8001';
+  const WS_URL = 'ws://localhost:8001/ws';
+
+  let ws           = null;
+  let chartData    = [];
+  let selectedFile = null;
+
+  // ── WebSocket ───────────────────────────────
+  function connectWS() {
+    ws = new WebSocket(WS_URL);
+
+    ws.onopen = () => {
+      document.getElementById('wsBadge').textContent = 'Connected';
+      document.getElementById('wsBadge').className   = 'ws-badge ws-connected';
+      log('WebSocket connected', 'success');
+    };
+
+    ws.onmessage = (e) => {
+      const data = JSON.parse(e.data);
+      if      (data.type === 'frame_update')        updateStats(data);
+      else if (data.type === 'status')              updateProgress(data.frame, data.total, data.progress);
+      else if (data.type === 'processing_complete') {
+        showSummary(data);
+        document.getElementById('downloadBtn').disabled = false;
+        log('Processing complete!', 'success');
+      }
+      else if (data.type === 'error') {
+        log(`Error: ${data.message}`, 'alert');
+        showStatus(data.message, 'error');
+      }
+    };
+
+    ws.onclose = () => {
+      document.getElementById('wsBadge').textContent = 'Disconnected';
+      document.getElementById('wsBadge').className   = 'ws-badge ws-disconnected';
+      setTimeout(connectWS, 3000);
+    };
+
+    ws.onerror = () => { log('WebSocket error — retrying in 3s', 'alert'); };
+  }
+
+  // ── File Selection ──────────────────────────
+  document.getElementById('fileInput').addEventListener('change', (e) => {
+    selectedFile = e.target.files[0];
+    if (selectedFile) {
+      document.getElementById('uploadText').textContent =
+        `${selectedFile.name} (${(selectedFile.size / 1024 / 1024).toFixed(1)} MB)`;
+      document.getElementById('uploadBtn').disabled = false;
+      log(`File selected: ${selectedFile.name}`, 'info');
+    }
+  });
+
+  // Drag and drop
+  const uploadArea = document.getElementById('uploadArea');
+  uploadArea.addEventListener('dragover',  (e) => { e.preventDefault(); uploadArea.classList.add('dragover'); });
+  uploadArea.addEventListener('dragleave', ()  => { uploadArea.classList.remove('dragover'); });
+  uploadArea.addEventListener('drop', (e) => {
+    e.preventDefault();
+    uploadArea.classList.remove('dragover');
+    const file = e.dataTransfer.files[0];
+    if (file) {
+      document.getElementById('fileInput').files = e.dataTransfer.files;
+      selectedFile = file;
+      document.getElementById('uploadText').textContent =
+        `${file.name} (${(file.size / 1024 / 1024).toFixed(1)} MB)`;
+      document.getElementById('uploadBtn').disabled = false;
+    }
+  });
+
+  // ── Upload ──────────────────────────────────
+  async function uploadVideo() {
+    if (!selectedFile) return;
+    const formData = new FormData();
+    formData.append('file', selectedFile);
+
+    document.getElementById('uploadBtn').disabled    = true;
+    document.getElementById('uploadBtn').textContent = 'Uploading...';
+    log(`Uploading ${selectedFile.name}...`, 'info');
+
+    try {
+      const res  = await fetch(`${API}/api/upload`, { method: 'POST', body: formData });
+      const data = await res.json();
+
+      if (data.status === 'uploaded') {
+        showStatus(`Uploaded: ${data.filename} (${data.size_mb} MB)`, 'success');
+        document.getElementById('processBtn').disabled = false;
+        log(`Upload complete: ${data.filename}`, 'success');
+      } else {
+        showStatus(data.message, 'error');
+        log(`Upload failed: ${data.message}`, 'alert');
+        document.getElementById('uploadBtn').disabled = false;
+      }
+    } catch (err) {
+      log(`Upload error: ${err.message}`, 'alert');
+      document.getElementById('uploadBtn').disabled = false;
+    }
+
+    document.getElementById('uploadBtn').textContent = 'Upload Video';
+  }
+
+  // ── Process ─────────────────────────────────
+  async function startProcessing() {
+    document.getElementById('processBtn').disabled    = true;
+    document.getElementById('processBtn').textContent = 'Processing...';
+    document.getElementById('summaryCard').style.display = 'none';
+    chartData = [];
+
+    const capacity = document.getElementById('capacity').value;
+    log('Starting crowd counting...', 'info');
+
+    try {
+      const res  = await fetch(`${API}/api/process?capacity=${capacity}`, { method: 'POST' });
+      const data = await res.json();
+
+      if (data.status === 'started') {
+        showStatus('Processing started — watch live results!', 'success');
+        log('YOLOv8 + ByteTrack running...', 'info');
+      } else {
+        showStatus(data.message, 'error');
+        document.getElementById('processBtn').disabled    = false;
+        document.getElementById('processBtn').textContent = 'Start Counting';
+      }
+    } catch (err) {
+      log(`Error: ${err.message}`, 'alert');
+      document.getElementById('processBtn').disabled = false;
+    }
+  }
+
+  // ── Update UI ───────────────────────────────
+  function updateStats(data) {
+    const liveCount   = data.live_count   || 0;
+    const yoloRaw     = data.yolo_raw_count || 0;
+    const totalUnique = data.total_unique || 0;
+    const cpi         = data.cpi          || 0;
+    const density     = data.density      || {};
+    const est         = data.estimation_details || {};
+
+    document.getElementById('liveCount').textContent   = liveCount;
+    document.getElementById('yoloRaw').textContent     = yoloRaw;
+    document.getElementById('occlusionFactor').textContent = 
+      (est.occlusion_factor || 1.0).toFixed(1) + 'x';
+    document.getElementById('cpiValue').textContent    = cpi.toFixed(3);
+    document.getElementById('methodBadge').textContent = 
+      (est.method || '-').toUpperCase();
+    document.getElementById('frameNum').textContent    = data.frame || 0;
+
+    // Density badge
+    const badge  = document.getElementById('densityBadge');
+    const colors = {
+      LOW:      ['#166534', '#86efac'],
+      MODERATE: ['#713f12', '#fde68a'],
+      HIGH:     ['#7f1d1d', '#fca5a5'],
+      CRITICAL: ['#4c1d95', '#ddd6fe'],
+    };
+    const [bg, fg] = colors[density.level] || ['#1e293b', '#94a3b8'];
+    badge.textContent      = density.level || 'PROCESSING';
+    badge.style.background = bg;
+    badge.style.color      = fg;
+
+    // CPI color
+    const cpiEl = document.getElementById('cpiValue');
+    if      (cpi < 0.4) cpiEl.style.color = '#22c55e';
+    else if (cpi < 0.7) cpiEl.style.color = '#f59e0b';
+    else                cpiEl.style.color = '#ef4444';
+
+    // Chart
+    chartData.push(liveCount);
+    if (chartData.length > 60) chartData.shift();
+    updateChart();
+
+    // Log critical moments
+    if (density.level === 'CRITICAL') {
+      log(`CRITICAL: ${liveCount} people in frame! CPI:${cpi}`, 'alert');
+    } else if (density.level === 'HIGH' && data.frame % 30 === 0) {
+      log(`HIGH density: ${liveCount} people. CPI:${cpi}`, 'alert');
+    }
+  }
+
+  function updateProgress(frame, total, pct) {
+    document.getElementById('progressBar').style.width = `${pct}%`;
+    document.getElementById('progressText').textContent = `${pct}% (${frame}/${total} frames)`;
+  }
+
+  function updateChart() {
+    const container = document.getElementById('chartContainer');
+    const max = Math.max(...chartData, 1);
+    container.innerHTML = chartData.map((val) => {
+      const height = Math.max((val / max) * 140, 2);
+      let color = '#22c55e';
+      if (val > 50)  color = '#f59e0b';
+      if (val > 100) color = '#ef4444';
+      return `<div class="chart-bar" style="height:${height}px;background:${color};" title="${val} people"></div>`;
+    }).join('');
+    container.scrollLeft = container.scrollWidth;
+  }
+
+  function showSummary(data) {
+    document.getElementById('summaryCard').style.display = 'block';
+    const rows = [
+      ['Total Unique People', data.total_unique_people,              'Distinct individuals tracked'],
+      ['Peak Live Count',     data.peak_live_count,                  'Max in single frame'],
+      ['Average Live Count',  data.average_live_count,               'Mean across all frames'],
+      ['Peak CPI',            data.peak_cpi?.toFixed(3),             '0=safe, 0.85=crush threshold'],
+      ['Frames Processed',    data.total_frames_processed,           'Total frames analysed'],
+      ['Processing Time',     `${data.processing_time_seconds}s`,    'Wall clock time'],
+    ];
+    document.getElementById('summaryTable').innerHTML = rows.map(([metric, value, note]) =>
+      `<tr>
+        <td style="color:#94a3b8;">${metric}</td>
+        <td style="font-weight:600;color:#f1f5f9;">${value}</td>
+        <td style="color:#475569;font-size:0.75rem;">${note}</td>
+      </tr>`
+    ).join('');
+
+    document.getElementById('processBtn').disabled    = false;
+    document.getElementById('processBtn').textContent = 'Start Counting';
+  }
+
+  async function downloadOutput() {
+    window.open(`${API}/api/download-output`, '_blank');
+  }
+
+  function showStatus(msg, type) {
+    const el = document.getElementById('statusMsg');
+    el.textContent  = msg;
+    el.className    = `status-msg status-${type}`;
+    el.style.display = 'block';
+    setTimeout(() => { el.style.display = 'none'; }, 5000);
+  }
+
+  function log(msg, type = '') {
+    const box   = document.getElementById('logBox');
+    const entry = document.createElement('div');
+    const time  = new Date().toLocaleTimeString();
+    entry.className   = `log-entry ${type}`;
+    entry.textContent = `[${time}] ${msg}`;
+    box.appendChild(entry);
+    box.scrollTop = box.scrollHeight;
+  }
+
+  // Init
+  connectWS();
+  log('System ready. Upload a video file to begin.', 'info');
+</script>
+</body>
+</html>

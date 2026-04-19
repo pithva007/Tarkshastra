@@ -85,7 +85,7 @@ export function useWebSocket() {
       }
 
       // Forward other message types to window for App.jsx to handle
-      if (['alert_resolved', 'pdf_ready', 'call_update'].includes(parsed.type)) {
+      if (['alert_resolved', 'pdf_ready', 'call_update', 'vision_progress', 'vision_complete', 'vision_started'].includes(parsed.type)) {
         window.dispatchEvent(new CustomEvent('ws_message', { detail: parsed }))
       }
     }

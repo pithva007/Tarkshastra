@@ -11,11 +11,12 @@ import math
 import os
 import random
 import uuid
+import shutil
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Set
 
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException, File, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse, FileResponse
 from pydantic import BaseModel
@@ -36,6 +37,10 @@ from report_generator import generate_alert_report
 from replay_data import REPLAY_FRAMES
 from bus_simulator import get_bus_update_message, update_destination_cpi
 from historical import get_historical_for_corridor, get_seasonal_prediction
+from vision_bridge import (
+    vision_processor, get_all_vision_readings,
+    clear_vision_reading, CORRIDOR_CALIBRATION
+)
 
 # ── ML predictor (optional — graceful if models not yet trained) ──────────────
 try:
@@ -158,6 +163,10 @@ simulator = get_simulator()
 
 # Initialize bus simulator
 bus_simulator = BusSimulator()
+
+# Vision upload directory
+VISION_UPLOAD_DIR = Path("vision_uploads")
+VISION_UPLOAD_DIR.mkdir(exist_ok=True)
 
 
 async def handle_new_alert(data: dict):
@@ -1045,6 +1054,142 @@ async def get_calls_for_alert(alert_id: str):
             dict(zip([col[0] for col in cursor.description], row))
             for row in rows
         ]
+
+
+# ── Vision endpoints ──────────────────────────────────────────────────────────
+
+@app.post("/api/vision/upload")
+async def vision_upload_video(
+    corridor: str,
+    file: UploadFile = File(...),
+    corridor_width_m: float = None
+):
+    """Upload a video for crowd counting.
+    Automatically feeds result into CPI engine."""
+    
+    if vision_processor.processing:
+        return {
+            "status": "busy",
+            "message": (
+                f"Already processing video for "
+                f"{vision_processor.current_corridor}"
+            )
+        }
+    
+    # Validate corridor
+    valid_corridors = ["Ambaji", "Dwarka", "Somnath", "Pavagadh"]
+    if corridor not in valid_corridors:
+        return {
+            "status": "error",
+            "message": (
+                f"Invalid corridor. Choose from: "
+                f"{valid_corridors}"
+            )
+        }
+    
+    # Validate file type
+    allowed = [".mp4", ".avi", ".mov", ".mkv", ".webm"]
+    suffix = Path(file.filename).suffix.lower()
+    if suffix not in allowed:
+        return {
+            "status": "error",
+            "message": f"File type {suffix} not supported"
+        }
+    
+    # Save uploaded file
+    save_path = VISION_UPLOAD_DIR / f"{corridor}{suffix}"
+    with open(save_path, "wb") as f:
+        shutil.copyfileobj(file.file, f)
+    
+    file_size_mb = os.path.getsize(save_path) / 1024 / 1024
+    print(f"[VISION] Uploaded: {file.filename} "
+          f"({file_size_mb:.1f}MB) for {corridor}")
+    
+    # Start processing in background
+    asyncio.create_task(
+        process_vision_video(str(save_path), corridor, corridor_width_m)
+    )
+    
+    return {
+        "status": "processing_started",
+        "corridor": corridor,
+        "filename": file.filename,
+        "size_mb": round(file_size_mb, 1),
+        "message": (
+            f"Processing started for {corridor}. "
+            f"Connect to WebSocket for live updates."
+        )
+    }
+
+
+async def process_vision_video(
+    video_path: str,
+    corridor: str,
+    corridor_width_m: float = None
+):
+    """Background task for video processing."""
+    
+    # Progress callback — broadcasts to WebSocket
+    async def on_progress(data: dict):
+        await manager.broadcast(data)
+    
+    # Notify start
+    await manager.broadcast({
+        "type": "vision_started",
+        "corridor": corridor,
+        "message": f"Vision analysis started for {corridor}"
+    })
+    
+    result = await vision_processor.process_video_async(
+        video_path=video_path,
+        corridor=corridor,
+        corridor_width_m=corridor_width_m,
+        progress_callback=on_progress
+    )
+    
+    # Notify completion
+    await manager.broadcast({
+        "type": "vision_complete",
+        "corridor": corridor,
+        "result": result,
+        "message": (
+            f"Vision analysis complete for {corridor}. "
+            f"Peak count: {result.get('peak_live_count', 0)} "
+            f"people. Flow rate: "
+            f"{result.get('peak_flow_rate', 0)} pax/min."
+        )
+    })
+    
+    print(f"[VISION] Complete broadcast sent for {corridor}")
+
+
+@app.get("/api/vision/status")
+async def vision_status():
+    """Get current vision processing status."""
+    return {
+        "processing": vision_processor.processing,
+        "current_corridor": vision_processor.current_corridor,
+        "progress": vision_processor.progress,
+        "active_readings": get_all_vision_readings(),
+        "calibration": CORRIDOR_CALIBRATION
+    }
+
+
+@app.delete("/api/vision/clear/{corridor}")
+async def vision_clear(corridor: str):
+    """Clear vision reading — revert to simulation."""
+    clear_vision_reading(corridor)
+    return {
+        "status": "cleared",
+        "corridor": corridor,
+        "message": f"{corridor} reverted to simulation data"
+    }
+
+
+@app.get("/api/vision/readings")
+async def get_vision_readings():
+    """Get all active vision readings."""
+    return get_all_vision_readings()
 
 
 # ── Entry point ───────────────────────────────────────────────────────────────
