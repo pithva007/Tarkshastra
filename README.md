@@ -1,6 +1,5 @@
 # 🏛️ Tarkshastra (TS-11) — Navigation & Crowd Intelligence System
 **Gujarat Pilgrimage Corridors · Real-Time Stampede Window Predictor**
-🚀 **Live Demo:** [https://ts11-frontend.onrender.com](https://ts11-frontend.onrender.com) *(May take ~50s for Render cold start)*
 
 Tarkshastra is an advanced, real-time Crowd Intelligence and Stampede Prediction System designed to predict crush risks 8–12 minutes ahead for major pilgrimage sites (Ambaji, Dwarka, Somnath, and Pavagadh) in Gujarat. It utilizes a custom **Corridor Pressure Index (CPI)** engine backed by historical crowd observation data to pre-emptively alert specific administrative and transport agencies.
 
@@ -17,67 +16,52 @@ Tarkshastra creates a **predictive digital twin** of the pilgrimage corridors. B
 ## 🏗️ System Architecture Pipeline
 
 ```mermaid
-flowchart TD
-    subgraph DataSources [Data Ingestion]
-        CCTV[CCTV / Computer Vision]
-        GPS[Bus Transport / GPS]
-        Hist[(Historical Data)]
+graph TD
+    subgraph Data Sources
+        CCTV[CCTV Camera Feeds] --> |Computer Vision| ML_Engine
+        Buses[GSRTC Bus GPS/Ticketing] --> BusSimulator
+        Historical[(Historical CSV Data)] --> ML_Predictor
     end
 
-    subgraph CoreBackend [Python Core - FastAPI / ML]
-        Simulator{Core CPI Simulator}
-        ML[ML Predictor]
-        AlertEngine[Alert & Dispatch Service]
-        WSManager(WebSocket Manager)
+    subgraph Backend - FastAPI
+        BusSimulator --> Simulator(Core CPI Simulator)
+        ML_Engine --> Simulator
+        ML_Predictor --> Simulator
+        Simulator --> |Calculates CPI & TTB| AlertEngine[Alert & Dispatch Engine]
+        AlertEngine --> |Stores Alert| SQLite[(SQLite Database)]
+        Simulator --> |Continuous Stream| WS_Manager[WebSocket Manager]
+        AlertEngine --> |Twilio/IVR| CallService(Voice Call/SMS Notification)
     end
 
-    subgraph PersistentStorage [Storage & Connectors]
-        DB[(SQLite Logs)]
-        Twilio[Twilio/IVR Escalation]
+    subgraph Frontend - React + Vite
+        WS_Manager == 2s Updates ==> Dashboard[React Multi-Agency Dashboard]
+        Dashboard --> |?agency=police| PoliceView[Police Action Cards]
+        Dashboard --> |?agency=temple| TempleView[Temple Authority View]
+        Dashboard --> |?agency=gsrtc| BusView[GSRTC Control View]
+        
+        Dashboard --> Replay[Replay & What-If Mode]
+        Dashboard --> Reports[Report Generator & PDF Export]
     end
-
-    subgraph ClientFrontend [UI Layer - React + Vite]
-        Dash[Shared Control Dashboard]
-        Views[Specific Agency Portals]
-        Toys[Replay & What-If Mode]
-    end
-
-    CCTV --> ML
-    GPS --> ML
-    Hist --> ML
-    ML --> Simulator
-    Simulator --> AlertEngine
-    AlertEngine -.-> DB
-    AlertEngine -.-> Twilio
-    Simulator -->|Live Stream| WSManager
-    WSManager <--> Dash
-    Dash --> Views
-    Dash --> Toys
 ```
 
 ## 🔄 Operational Data Flowchart
 
 ```mermaid
-flowchart TD
-    Start([Ingest Live Flow Rates & Bursts]) --> Calc{Compute CPI Formula}
+flowchart LR
+    A[Ingest Live Flow Rate] --> B{Calculate CPI}
+    B -->|CPI < 0.4| C[Green Zone - Safe]
+    B -->|CPI 0.40 - 0.70| D[Amber Zone - Monitor]
+    B -->|CPI > 0.70| E[Red Zone - Alert]
     
-    Calc -->|CPI < 0.40| Safe[Green Zone: Safe]
-    Calc -->|CPI 0.40 - 0.70| Monitor[Amber Zone: Monitor]
-    Calc -->|CPI > 0.70| Danger[Red Zone: Breach Threshold]
-
-    Monitor --> Predict[[Run ML Trend Analysis]]
-    Predict --> Slope{Slope & TTB Evaluation}
+    D --> F[Run Predictive Model]
+    F --> G{Slope & TTB Analysis}
+    G -->|Self-Resolving| H[Log Event]
+    G -->|Genuine Crush| E
     
-    Slope -->|Self-Resolving Anomalies| Log[Log Event into Archive]
-    Slope -->|Escalating Trend| Genuine[Genuine Crush Imminent]
-    
-    Danger --> Dispatch[Dispatch Agency Specific Actions]
-    Genuine --> Dispatch
-    
-    Dispatch --> Timer{Wait for 90s Ack}
-    
-    Timer -->|Authority Acknowledges| Resolve[Register Handled Incident]
-    Timer -->|Ignored Countdown| Escalate[Trigger Off-Screen IVR Escalation]
+    E --> I[Dispatch Targeted Alerts]
+    I --> J[90s Ack Countdown]
+    J -->|Acknowledged| K[Resolve Alert]
+    J -->|Ignored| L[Escalate / Auto IVR Call]
 ```
 
 ---
