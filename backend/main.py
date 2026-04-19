@@ -16,6 +16,13 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Set
 
+# Load .env file for local dev (no-op if already set by Render)
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass
+
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException, File, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse, FileResponse
@@ -32,7 +39,11 @@ from database import (
 )
 from auth import login, verify_token, has_permission
 from auth import get_all_sessions, PERMISSIONS, get_session
-from call_service import trigger_corridor_calls, make_single_call
+from call_service import (
+    trigger_corridor_calls_async,
+    trigger_corridor_calls,   # kept for legacy /api/call-alert endpoint
+    make_single_call,
+)
 from report_generator import generate_alert_report
 from replay_data import REPLAY_FRAMES
 from bus_simulator import get_bus_update_message, update_destination_cpi
@@ -170,42 +181,164 @@ VISION_UPLOAD_DIR.mkdir(exist_ok=True)
 
 
 async def handle_new_alert(data: dict):
-    """Called when corridor transitions to SURGE alert."""
+    """Called every 2 seconds by simulator when corridor is in SURGE state.
+    Guards ensure we only start ONE 90-second timer per alert."""
     alert_id = data["alert_id"]
     corridor = data["corridor"]
-    
-    # Check if this corridor already has active alert
+
+    # ── Guard 1: corridor already has an active alert ─────────────────────────
     existing = active_corridor_alerts.get(corridor)
     if existing:
-        # Same corridor already alerted — skip
-        print(f"[ALERT SKIP] {corridor} already has active alert: {existing}")
+        # Same corridor already alerted — timer already running
         return
-    
-    # Check cooldown — was this corridor alerted recently?
+
+    # ── Guard 2: corridor is in cooldown after a recent alert ─────────────────
     last_alert_time = alert_resolution_time.get(corridor, 0)
     minutes_since = (datetime.now(timezone.utc).timestamp() - last_alert_time) / 60
     if minutes_since < ALERT_COOLDOWN_MINUTES:
         remaining = ALERT_COOLDOWN_MINUTES - minutes_since
         print(f"[ALERT SKIP] {corridor} on cooldown ({remaining:.1f} min remaining)")
         return
-    
-    # New alert for this corridor
+
+    # ── Guard 3: alert_id already processed ───────────────────────────────────
+    if alert_id in called_alert_ids:
+        return
+
+    # ── New alert — register immediately so guards above fire next iteration ──
     active_corridor_alerts[corridor] = alert_id
     called_alert_ids.add(alert_id)
-    print(f"[ALERT NEW] {corridor}: {alert_id}")
-    
-    # Generate PDF + make calls in background
-    asyncio.create_task(trigger_calls_and_log(
+
+    print(f"[ALERT NEW] ── {corridor}: {alert_id} ──")
+    print(f"[ALERT NEW] CPI={data['cpi']:.3f} | "
+          f"TTB={data['time_to_breach_minutes']:.1f}min | "
+          f"Type={data['surge_type']}")
+
+    # ── Persist alert to DB ───────────────────────────────────────────────────
+    try:
+        await insert_alert(
+            alert_id=alert_id,
+            corridor=corridor,
+            cpi=data["cpi"],
+            surge_type=data["surge_type"],
+            ml_confidence=data["ml_confidence"],
+        )
+    except Exception as e:
+        print(f"[ALERT DB ERROR] {e}")
+
+    # ── Broadcast RED alert to all dashboards ─────────────────────────────────
+    await manager.broadcast({
+        "type": "red_alert",
+        "alert_id": alert_id,
+        "corridor": corridor,
+        "cpi": data["cpi"],
+        "surge_type": data["surge_type"],
+        "time_to_breach_minutes": data["time_to_breach_minutes"],
+        "ml_confidence": data["ml_confidence"],
+        "message": (
+            f"🚨 RED ALERT: {corridor} — CPI {data['cpi']:.2f}. "
+            f"Acknowledge within 90 seconds or emergency calls will be triggered."
+        ),
+        "ack_deadline_seconds": 90,
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+    })
+
+    # ── Start 90-second acknowledgment timer in background ────────────────────
+    print(f"[TIMER] Starting 90-second ack timer for {alert_id}")
+    asyncio.create_task(
+        _ack_timer_and_call(
+            alert_id=alert_id,
+            corridor=corridor,
+            cpi=data["cpi"],
+            ttb_minutes=data["time_to_breach_minutes"],
+            surge_type=data["surge_type"],
+            flow_rate=data["flow_rate"],
+            transport_burst=data["transport_burst"],
+            chokepoint_density=data["chokepoint_density"],
+            ml_confidence=data["ml_confidence"],
+        )
+    )
+
+
+# ── 90-second acknowledgment timer ───────────────────────────────────────────
+# Tracks which alerts have been acknowledged before the timer expires
+_acknowledged_alerts: set = set()
+
+ACK_TIMEOUT_SECONDS = 90
+
+
+async def mark_alert_acknowledged(alert_id: str):
+    """Call this when any agency acknowledges the alert.
+    Prevents the voice call from firing."""
+    _acknowledged_alerts.add(alert_id)
+    print(f"[ACK] Alert {alert_id} acknowledged — call suppressed")
+
+
+async def _ack_timer_and_call(
+    alert_id: str,
+    corridor: str,
+    cpi: float,
+    ttb_minutes: float,
+    surge_type: str,
+    flow_rate: float,
+    transport_burst: float,
+    chokepoint_density: float,
+    ml_confidence: int,
+):
+    """Waits ACK_TIMEOUT_SECONDS. If alert is NOT acknowledged by then,
+    triggers voice calls to all agencies. This is the core fix."""
+
+    print(f"[TIMER] {alert_id} — waiting {ACK_TIMEOUT_SECONDS}s for acknowledgment...")
+
+    # Broadcast countdown start
+    await manager.broadcast({
+        "type": "ack_timer_started",
+        "alert_id": alert_id,
+        "corridor": corridor,
+        "timeout_seconds": ACK_TIMEOUT_SECONDS,
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+    })
+
+    await asyncio.sleep(ACK_TIMEOUT_SECONDS)
+
+    # ── Check if acknowledged ─────────────────────────────────────────────────
+    if alert_id in _acknowledged_alerts:
+        print(f"[TIMER] {alert_id} — acknowledged before timeout. No call needed.")
+        await manager.broadcast({
+            "type": "call_suppressed",
+            "alert_id": alert_id,
+            "corridor": corridor,
+            "reason": "acknowledged_before_timeout",
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+        })
+        return
+
+    # ── Timer expired — no acknowledgment received → trigger calls ────────────
+    print(f"[TIMER] ⏰ {alert_id} — 90s expired, NO acknowledgment received!")
+    print(f"[TIMER] Triggering emergency calls for {corridor}...")
+
+    await manager.broadcast({
+        "type": "ack_timeout",
+        "alert_id": alert_id,
+        "corridor": corridor,
+        "message": (
+            f"⚠️ No acknowledgment received for {corridor} alert. "
+            f"Triggering emergency calls now."
+        ),
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+    })
+
+    # ── Fire calls + PDF generation ───────────────────────────────────────────
+    await trigger_calls_and_log(
         corridor=corridor,
-        cpi=data["cpi"],
-        ttb_minutes=data["time_to_breach_minutes"],
-        surge_type=data["surge_type"],
+        cpi=cpi,
+        ttb_minutes=ttb_minutes,
+        surge_type=surge_type,
         alert_id=alert_id,
-        flow_rate=data["flow_rate"],
-        transport_burst=data["transport_burst"],
-        chokepoint_density=data["chokepoint_density"],
-        ml_confidence=data["ml_confidence"]
-    ))
+        flow_rate=flow_rate,
+        transport_burst=transport_burst,
+        chokepoint_density=chokepoint_density,
+        ml_confidence=ml_confidence,
+    )
 
 # ── Lifecycle ─────────────────────────────────────────────────────────────────
 @app.on_event("startup")
@@ -341,6 +474,9 @@ async def submit_alert_reply(data: dict):
     
     user_session = get_session(token)
     replied_at = datetime.utcnow().isoformat()
+
+    # Suppress the 90-second call timer — agency has responded
+    await mark_alert_acknowledged(data.get("alert_id", ""))
     
     async with aiosqlite.connect("stampede.db") as db:
         await save_alert_reply(
@@ -563,6 +699,8 @@ async def acknowledge(alert_id: str, agency: str):
     ok = await ack_alert(alert_id, agency)
     if not ok:
         raise HTTPException(404, "alert not found or already acknowledged")
+    # Suppress the 90-second call timer for this alert
+    await mark_alert_acknowledged(alert_id)
     return {"status": "acknowledged", "alert_id": alert_id, "agency": agency}
 
 
@@ -1110,8 +1248,8 @@ async def trigger_calls_and_log(
         "timestamp": datetime.utcnow().isoformat()
     })
 
-    # STEP 3 — Make calls (Twilio handles PDF mention in the voice message via call_service.py)
-    results = trigger_corridor_calls(
+    # STEP 3 — Make calls (async — does NOT block event loop)
+    results = await trigger_corridor_calls_async(
         corridor=corridor,
         cpi=cpi,
         ttb_minutes=ttb_minutes,
