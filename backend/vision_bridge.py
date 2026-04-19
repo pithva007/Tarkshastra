@@ -262,7 +262,6 @@ class VisionProcessor:
             print(f"[VISION] Probe failed: {probe_err}")
             self._total_frames = 100  # fallback
             self.total_frames_to_process = 100
-            self.frames_processed = 0
 
         try:
             counter = self._get_counter()
@@ -275,19 +274,16 @@ class VisionProcessor:
             loop = asyncio.get_event_loop()
             frame_results = []
 
-            # processed_frames is shared between the threads via a list cell
-            processed_counter = [0]
-
             def frame_callback(frame_result):
-                """Called on each processed frame (inside thread)."""
-                processed_counter[0] += 1
-                self.frames_processed = processed_counter[0]  # expose to status
-
-                # Progress based on frames we've actually processed
-                self.progress = min(
-                    round(processed_counter[0] / self._total_frames * 100),
-                    99  # cap at 99 until fully done
-                )
+                """Called on each processed frame (inside thread).
+                Uses counter.frame_count for progress — IDENTICAL to api.py.
+                """
+                # ── Progress from counter directly (same as api.py) ──────
+                frame_no   = frame_result.get("frame", counter.frame_count)
+                total      = max(counter.total_frames, 1)
+                self.frames_processed = frame_no
+                self.total_frames_to_process = total
+                self.progress = min(round(frame_no / total * 100), 99)
 
                 live_count = frame_result.get("live_count", 0)
                 estimated  = frame_result.get("total_unique", live_count)
@@ -296,21 +292,23 @@ class VisionProcessor:
                     live_count, corridor, corridor_width_m
                 )
 
-                # Store reading — updates every processed frame
-                store_vision_reading(
-                    corridor=corridor,
-                    live_count=live_count,
-                    estimated_count=estimated,
-                    cpi=cpi,
-                    flow_rate=flow_rate
-                )
+                # Only store every 3rd frame to reduce noise
+                # (we still process every frame for tracking continuity)
+                if frame_no % 3 == 0:
+                    store_vision_reading(
+                        corridor=corridor,
+                        live_count=live_count,
+                        estimated_count=estimated,
+                        cpi=cpi,
+                        flow_rate=flow_rate
+                    )
 
-                frame_results.append({
-                    "frame": frame_result["frame"],
-                    "live_count": live_count,
-                    "flow_rate": flow_rate,
-                    "cpi": cpi
-                })
+                    frame_results.append({
+                        "frame": frame_no,
+                        "live_count": live_count,
+                        "flow_rate": flow_rate,
+                        "cpi": cpi
+                    })
 
                 # Check alert threshold — fire once per session
                 if (
@@ -359,17 +357,17 @@ class VisionProcessor:
                         loop
                     )
 
-            # ── Run CPU processing in thread pool ─────────────────────
-            # We wrap process_video to apply frame-skipping and resizing
-            # BEFORE handing frames to YOLO — this avoids 4K overhead
-
+            # ── Use counter.process_video — EXACT same path as api.py ────
+            # This is the proven working code path.
+            # ByteTrack requires every frame for temporal ID continuity;
+            # skipping frames in the YOLO loop breaks tracking.
+            # Speed is handled by yolo's imgsz=640 internal resize.
             summary = await loop.run_in_executor(
                 None,
-                lambda: _process_with_skip(
-                    counter=counter,
+                lambda: counter.process_video(
                     video_path=video_path,
-                    frame_skip=FRAME_SKIP,
-                    max_width=MAX_PROCESS_WIDTH,
+                    output_path=None,
+                    show_window=False,
                     callback=frame_callback
                 )
             )
