@@ -42,7 +42,12 @@ export default function NotificationBell({
         className="relative p-2 rounded-lg hover:bg-gray-800 transition-colors"
         aria-label="Notifications"
       >
-        <span className={`text-xl ${hasCritical ? 'animate-bounce' : ''}`}>🔔</span>
+        <span className={`${hasCritical ? 'animate-bounce' : ''}`}>
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
+            <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+          </svg>
+        </span>
         {unreadCount > 0 && (
           <span className={`absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] rounded-full text-[10px] font-bold flex items-center justify-center px-1 ${
             hasCritical ? 'bg-red-600 animate-pulse' : 'bg-amber-500'
@@ -93,7 +98,17 @@ export default function NotificationBell({
                         fontSize: 13,
                         marginBottom: 6
                       }}>
-                        {n.type === 'pdf_ready' ? '📄 Incident Report Ready' : '📞 Calls Made'}
+                        {n.type === 'pdf_ready' ? (
+                          <span className="flex items-center gap-1.5">
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+                            Incident Report Ready
+                          </span>
+                        ) : (
+                          <span className="flex items-center gap-1.5">
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 13.5a19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 3.44 2.68h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 10.09a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+                            Calls Made
+                          </span>
+                        )}
                       </div>
                       <div style={{
                         color: '#94a3b8',

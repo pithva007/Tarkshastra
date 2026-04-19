@@ -25,7 +25,10 @@ class ErrorBoundary extends React.Component {
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           flexDirection: 'column', padding: '2rem', fontFamily: 'monospace'
         }}>
-          <div style={{ fontSize: '2rem', marginBottom: '1rem' }}>💥 App Crashed</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', fontSize: '1.5rem', marginBottom: '1rem' }}>
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#ef4444" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+            App Crashed
+          </div>
           <div style={{
             background: '#1e293b', border: '1px solid #ef4444', borderRadius: '12px',
             padding: '1.5rem', maxWidth: '800px', width: '100%'

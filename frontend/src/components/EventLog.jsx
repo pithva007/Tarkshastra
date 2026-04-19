@@ -196,9 +196,10 @@ export default function EventLog() {
                       {isFullyAcked(al) ? (
                         <button
                           onClick={() => openReport(al)}
-                          className="text-xs bg-indigo-900 text-indigo-300 hover:bg-indigo-800 border border-indigo-700 px-2 py-0.5 rounded-full font-semibold transition-colors"
+                          className="text-xs bg-indigo-900 text-indigo-300 hover:bg-indigo-800 border border-indigo-700 px-2 py-0.5 rounded-full font-semibold transition-colors flex items-center gap-1"
                         >
-                          📋 Report
+                          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+                          Report
                         </button>
                       ) : (
                         <span className="text-gray-600 text-xs">—</span>
@@ -218,21 +219,24 @@ export default function EventLog() {
           <div className="bg-gray-900 border border-gray-700 rounded-2xl p-6 w-full max-w-lg shadow-2xl">
             {/* Header */}
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-sm font-bold text-white uppercase tracking-wide">
-                📋 Incident Report
+              <h2 className="text-sm font-bold text-white uppercase tracking-wide flex items-center gap-1.5">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+                Incident Report
               </h2>
               <div className="flex gap-2">
                 <button
                   onClick={() => window.print()}
-                  className="text-xs bg-gray-700 hover:bg-gray-600 text-white px-3 py-1.5 rounded-lg transition-colors"
+                  className="text-xs bg-gray-700 hover:bg-gray-600 text-white px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1"
                 >
-                  🖨 Print
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+                  Print
                 </button>
                 <button
                   onClick={() => { setReportAlert(null); setReport(null) }}
-                  className="text-xs text-gray-400 hover:text-white px-3 py-1.5 rounded-lg bg-gray-800"
+                  className="text-xs text-gray-400 hover:text-white px-3 py-1.5 rounded-lg bg-gray-800 flex items-center gap-1"
                 >
-                  ✕ Close
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                  Close
                 </button>
               </div>
             </div>
@@ -299,8 +303,9 @@ function fmtTime(iso) {
 function ackCell(ts) {
   if (!ts) return <span className="text-amber-400 text-xs font-semibold">Pending</span>
   return (
-    <span className="text-green-400 text-xs font-mono">
-      ✓ {new Date(ts).toLocaleTimeString()}
+    <span className="text-green-400 text-xs font-mono flex items-center gap-1">
+      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+      {new Date(ts).toLocaleTimeString()}
     </span>
   )
 }

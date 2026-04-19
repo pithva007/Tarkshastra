@@ -18,15 +18,15 @@ function buildMessage(role, reading) {
 
   switch (role) {
     case 'driver':
-      return `⚠ ALERT: ${corridor} corridor CPI ${cpiStr}. Hold at checkpoint — do NOT proceed to temple. ETA impact: +${ttb} minutes.`
+      return `[ALERT] ${corridor} corridor CPI ${cpiStr}. Hold at checkpoint — do NOT proceed to temple. ETA impact: +${ttb} minutes.`
     case 'police':
-      return `🚨 URGENT: Crush risk at ${corridor} in ${ttb} minutes. Deploy to Choke Point B immediately. Alert ID: ${alert_id}`
+      return `[URGENT] Crush risk at ${corridor} in ${ttb} minutes. Deploy to Choke Point B immediately. Alert ID: ${alert_id}`
     case 'temple':
-      return `🛕 ACTION: Activate darshan hold NOW. CPI: ${cpiStr} — ${surge_type}. Redirect pilgrims to Queue C.`
+      return `[ACTION] Activate darshan hold NOW. CPI: ${cpiStr} — ${surge_type}. Redirect pilgrims to Queue C.`
     case 'gsrtc':
-      return `🚌 HOLD BUSES: ${corridor} at capacity. Hold all vehicles at 3km checkpoint. Expected wait: ${ttb} minutes.`
+      return `[HOLD BUSES] ${corridor} at capacity. Hold all vehicles at 3km checkpoint. Expected wait: ${ttb} minutes.`
     default:
-      return `⚠ ALERT: ${corridor} CPI ${cpiStr} — ${surge_type}`
+      return `[ALERT] ${corridor} CPI ${cpiStr} — ${surge_type}`
   }
 }
 
@@ -105,8 +105,8 @@ export function useNotifications(corridorData = {}, agency = null) {
 
       // Browser push notification
       const title = isCritical
-        ? `🚨 CRITICAL: ${reading.corridor}`
-        : `⚠ ALERT: ${reading.corridor}`
+        ? `[CRITICAL] ${reading.corridor}`
+        : `[ALERT] ${reading.corridor}`
       fireBrowserNotification(title, message)
     })
   }, [corridorData, agency])

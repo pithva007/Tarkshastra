@@ -59,13 +59,15 @@ export default function ReplayMode() {
         </div>
         <div className="flex gap-2 flex-wrap">
           {current?.prediction_fired && (
-            <span className="bg-amber-900 border border-amber-600 text-amber-300 text-xs font-bold px-3 py-1 rounded-full animate-pulse">
-              ⚡ PREDICTION FIRED — 10 min lead
+            <span className="bg-amber-900 border border-amber-600 text-amber-300 text-xs font-bold px-3 py-1 rounded-full animate-pulse flex items-center gap-1">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+              PREDICTION FIRED — 10 min lead
             </span>
           )}
           {current?.crush_peak && (
-            <span className="bg-red-900 border border-red-600 text-red-300 text-xs font-bold px-3 py-1 rounded-full animate-pulse">
-              💀 CRUSH PEAK
+            <span className="bg-red-900 border border-red-600 text-red-300 text-xs font-bold px-3 py-1 rounded-full animate-pulse flex items-center gap-1">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+              CRUSH PEAK
             </span>
           )}
         </div>
@@ -93,8 +95,9 @@ export default function ReplayMode() {
               : 'bg-amber-950 border-amber-700'
           }`}>
             {current.prediction_fired && (
-              <p className="text-xs text-amber-400 font-bold uppercase tracking-widest mb-2">
-                ⚡ Prediction fired — {(peakFrame - predFrame) * 5}s before peak
+              <p className="text-xs text-amber-400 font-bold uppercase tracking-widest mb-2 flex items-center gap-1">
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+                Prediction fired — {(peakFrame - predFrame) * 5}s before peak
               </p>
             )}
             <p className={`text-base font-bold ${isCritical ? 'text-red-300' : 'text-amber-300'}`}>
@@ -197,14 +200,19 @@ export default function ReplayMode() {
       {/* Controls */}
       <div className="flex items-center gap-2 justify-center flex-wrap">
         <button onClick={reset}
-          className="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg text-sm font-medium transition-colors">
-          ⏮ Reset
+          className="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg text-sm font-medium transition-colors flex items-center gap-1.5">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polygon points="19 20 9 12 19 4 19 20"/><line x1="5" y1="19" x2="5" y2="5"/></svg>
+          Reset
         </button>
         <button onClick={togglePlay}
-          className={`px-8 py-2 rounded-lg text-sm font-bold transition-colors ${
+          className={`px-8 py-2 rounded-lg text-sm font-bold transition-colors flex items-center gap-1.5 ${
             playing ? 'bg-amber-600 hover:bg-amber-700' : 'bg-green-600 hover:bg-green-700'
           }`}>
-          {playing ? '⏸ Pause' : '▶ Play'}
+          {playing ? (
+            <><svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>Pause</>
+          ) : (
+            <><svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>Play</>
+          )}
         </button>
         {SPEEDS.map((s) => (
           <button key={s} onClick={() => setSpeed(s)}

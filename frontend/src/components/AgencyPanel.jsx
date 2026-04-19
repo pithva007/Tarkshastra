@@ -23,10 +23,35 @@ const AGENCY_ACTIONS = {
   },
 }
 
+const AGENCY_ICONS = {
+  police: (
+    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12 2L4 6v6c0 5.25 3.5 10.15 8 11.5C16.5 22.15 20 17.25 20 12V6L12 2z"/>
+      <path d="M9 12l2 2 4-4"/>
+    </svg>
+  ),
+  temple: (
+    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12 2L2 7h20L12 2z"/>
+      <rect x="4" y="7" width="16" height="13"/>
+      <rect x="9" y="12" width="6" height="8"/>
+      <line x1="12" y1="2" x2="12" y2="7"/>
+    </svg>
+  ),
+  gsrtc: (
+    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="1" y="6" width="22" height="13" rx="2"/>
+      <path d="M16 6V4a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/>
+      <circle cx="7" cy="19" r="2"/><circle cx="17" cy="19" r="2"/>
+      <line x1="9" y1="19" x2="15" y2="19"/>
+    </svg>
+  ),
+}
+
 const AGENCY_META = {
-  police: { icon: '🚔', label: 'Police Control Room',      color: 'blue'   },
-  temple: { icon: '🛕', label: 'Temple Trust Authority',   color: 'yellow' },
-  gsrtc:  { icon: '🚌', label: 'GSRTC Bus Operations',     color: 'green'  },
+  police: { label: 'Police Control Room',      color: 'blue'   },
+  temple: { label: 'Temple Trust Authority',   color: 'yellow' },
+  gsrtc:  { label: 'GSRTC Bus Operations',     color: 'green'  },
 }
 
 const BORDER = { blue: 'border-blue-500', yellow: 'border-yellow-500', green: 'border-green-500' }
@@ -121,7 +146,7 @@ export default function AgencyPanel({ agency, corridorData, selectedCorridor }) 
       {/* Header */}
       <div className="flex items-start justify-between mb-3">
         <div className="flex items-center gap-2">
-          <span className="text-2xl">{meta.icon}</span>
+          <span className="text-2xl">{AGENCY_ICONS[agency]}</span>
           <div>
             <p className="font-bold text-sm text-white leading-tight">{meta.label}</p>
             <p className="text-xs text-gray-400 uppercase tracking-wide">{agency}</p>
@@ -169,7 +194,12 @@ export default function AgencyPanel({ agency, corridorData, selectedCorridor }) 
                 : 'bg-white text-gray-900 hover:bg-gray-100'
             }`}
           >
-            {secsLeft === 0 ? '⚠️ TIMEOUT — ESCALATING' : 'ACKNOWLEDGE & DEPLOY'}
+            {secsLeft === 0 ? (
+              <span className="flex items-center justify-center gap-1.5">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                TIMEOUT — ESCALATING
+              </span>
+            ) : 'ACKNOWLEDGE & DEPLOY'}
           </button>
         </>
       )}
@@ -177,7 +207,7 @@ export default function AgencyPanel({ agency, corridorData, selectedCorridor }) 
       {/* Acknowledged */}
       {acked && (
         <div className="flex items-center gap-2 text-green-400 text-sm font-semibold py-1">
-          <span>✅</span>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
           <span>Acknowledged at {ackTime}</span>
         </div>
       )}
@@ -192,12 +222,26 @@ export default function AgencyPanel({ agency, corridorData, selectedCorridor }) 
 
 function SurgeBadge({ type }) {
   const cfg = {
-    GENUINE_CRUSH:  ['bg-red-900 text-red-300 animate-pulse', '🔴 CRUSH'],
-    SELF_RESOLVING: ['bg-blue-900 text-blue-300',             '🔵 RESOLVING'],
-    SAFE:           ['bg-gray-800 text-gray-300',             '✅ SAFE'],
+    GENUINE_CRUSH:  {
+      cls: 'bg-red-900 text-red-300 animate-pulse',
+      icon: <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="10"/></svg>,
+      label: 'CRUSH',
+    },
+    SELF_RESOLVING: {
+      cls: 'bg-blue-900 text-blue-300',
+      icon: <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="10"/></svg>,
+      label: 'RESOLVING',
+    },
+    SAFE: {
+      cls: 'bg-gray-800 text-gray-300',
+      icon: <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>,
+      label: 'SAFE',
+    },
   }
-  const [cls, txt] = cfg[type] || cfg.SAFE
+  const { cls, icon, label } = cfg[type] || cfg.SAFE
   return (
-    <span className={`text-xs font-bold px-2 py-1 rounded-full ${cls}`}>{txt}</span>
+    <span className={`inline-flex items-center gap-1 text-xs font-bold px-2 py-1 rounded-full ${cls}`}>
+      {icon}{label}
+    </span>
   )
 }
