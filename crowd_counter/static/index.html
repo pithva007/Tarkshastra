@@ -131,6 +131,15 @@
     .status-info    { background: #1e3a5f; color: #93c5fd; }
     .status-success { background: #14532d; color: #86efac; }
     .status-error   { background: #7f1d1d; color: #fca5a5; }
+
+    @keyframes spin {
+      from { transform: rotate(0deg); }
+      to   { transform: rotate(360deg); }
+    }
+    @keyframes shimmer {
+      0%   { transform: translateX(-100%); }
+      100% { transform: translateX(200%); }
+    }
   </style>
 </head>
 <body>
@@ -206,14 +215,85 @@
       <div style="text-align:center;margin-top:0.75rem;">
         <span class="density-badge" id="densityBadge" style="background:#166534;color:#86efac;">WAITING</span>
       </div>
-      <div class="progress-bar-bg" style="margin-top:0.75rem;">
-        <div class="progress-bar" id="progressBar" style="width:0%"></div>
-      </div>
-      <div style="text-align:center;font-size:0.75rem;color:#64748b;margin-top:0.25rem;">
-        <span id="progressText">0%</span>
+
+      <!-- ── Rich Progress Panel ── -->
+      <div id="progressPanel" style="
+        background:#0f172a;
+        border:1px solid #334155;
+        border-radius:10px;
+        padding:14px;
+        margin-top:12px;
+        display:none;
+      ">
+        <!-- Top row: spinner label + pct -->
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+          <div style="font-size:12px;font-weight:600;color:#60a5fa;display:flex;align-items:center;gap:6px;">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none"
+                 stroke="#60a5fa" stroke-width="2"
+                 style="animation:spin 1.4s linear infinite;">
+              <path d="M12 2a10 10 0 0 1 10 10"/>
+              <circle cx="12" cy="12" r="10" stroke-opacity="0.2"/>
+            </svg>
+            YOLOv8 Analysing
+          </div>
+          <span id="progressPct" style="
+            font-size:16px;font-weight:700;
+            color:#60a5fa;font-family:monospace;
+          ">0%</span>
+        </div>
+
+        <!-- Glowing gradient bar with shimmer -->
+        <div style="
+          height:8px;background:#1e293b;border-radius:4px;
+          overflow:hidden;margin-bottom:10px;position:relative;
+        ">
+          <div id="progressBarFill" style="
+            width:0%;height:100%;
+            background:linear-gradient(90deg,#3b82f6,#60a5fa);
+            border-radius:4px;
+            transition:width 0.6s ease;
+            box-shadow:0 0 8px #3b82f680;
+          "></div>
+          <div style="
+            position:absolute;top:0;left:0;
+            width:100%;height:100%;
+            background:linear-gradient(90deg,transparent 0%,rgba(255,255,255,0.15) 50%,transparent 100%);
+            animation:shimmer 1.5s infinite;
+            border-radius:4px;
+          "></div>
+        </div>
+
+        <!-- Frame counters: read / left / total -->
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:10px;">
+          <div style="background:#1e293b;border-radius:6px;padding:8px;text-align:center;">
+            <div id="pcFramesDone" style="font-size:15px;font-weight:700;color:#22c55e;font-family:monospace;">0</div>
+            <div style="font-size:10px;color:#64748b;margin-top:2px;">Frames read</div>
+          </div>
+          <div style="background:#1e293b;border-radius:6px;padding:8px;text-align:center;">
+            <div id="pcFramesLeft" style="font-size:15px;font-weight:700;color:#f59e0b;font-family:monospace;">—</div>
+            <div style="font-size:10px;color:#64748b;margin-top:2px;">Frames left</div>
+          </div>
+          <div style="background:#1e293b;border-radius:6px;padding:8px;text-align:center;">
+            <div id="pcFramesTotal" style="font-size:15px;font-weight:700;color:#94a3b8;font-family:monospace;">—</div>
+            <div style="font-size:10px;color:#64748b;margin-top:2px;">Total frames</div>
+          </div>
+        </div>
+
+        <!-- Live stats + timing row -->
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px;">
+          <div style="display:flex;gap:10px;flex-wrap:wrap;">
+            <span id="pcLiveCount" style="font-size:11px;color:#60a5fa;display:none;">👤 0 visible</span>
+            <span id="pcCpiLive"   style="font-size:11px;color:#22c55e;display:none;">CPI 0.000</span>
+          </div>
+          <div style="font-size:11px;color:#475569;display:flex;gap:8px;">
+            <span id="pcElapsed"></span>
+            <span id="pcEta" style="color:#60a5fa;font-weight:600;"></span>
+          </div>
+        </div>
       </div>
     </div>
   </div>
+
 
   <div class="grid">
     <!-- Live Chart -->
@@ -254,6 +334,7 @@
   let ws           = null;
   let chartData    = [];
   let selectedFile = null;
+  let processingStartTime = null;  // for ETA calculation
 
   // ── WebSocket ───────────────────────────────
   function connectWS() {
@@ -354,6 +435,20 @@
     document.getElementById('processBtn').textContent = 'Processing...';
     document.getElementById('summaryCard').style.display = 'none';
     chartData = [];
+    processingStartTime = Date.now();  // start timer
+
+    // Show the rich progress panel
+    document.getElementById('progressPanel').style.display = 'block';
+    document.getElementById('progressBarFill').style.width = '0%';
+    document.getElementById('progressPct').textContent = '0%';
+    document.getElementById('progressPct').style.color = '#60a5fa';
+    document.getElementById('pcFramesDone').textContent  = '0';
+    document.getElementById('pcFramesLeft').textContent  = '—';
+    document.getElementById('pcFramesTotal').textContent = '—';
+    document.getElementById('pcElapsed').textContent = '';
+    document.getElementById('pcEta').textContent = '';
+    document.getElementById('pcLiveCount').style.display = 'none';
+    document.getElementById('pcCpiLive').style.display   = 'none';
 
     const capacity = document.getElementById('capacity').value;
     log('Starting crowd counting...', 'info');
@@ -394,6 +489,15 @@
       (est.method || '-').toUpperCase();
     document.getElementById('frameNum').textContent    = data.frame || 0;
 
+    // Feed live count + CPI into the progress panel too
+    const pcLC  = document.getElementById('pcLiveCount');
+    const pcCPI = document.getElementById('pcCpiLive');
+    pcLC.textContent  = `👤 ${liveCount} visible`;
+    pcLC.style.display = 'inline';
+    pcCPI.textContent  = `CPI ${cpi.toFixed(3)}`;
+    pcCPI.style.color  = cpi >= 0.85 ? '#ef4444' : cpi >= 0.70 ? '#f59e0b' : '#22c55e';
+    pcCPI.style.display = 'inline';
+
     // Density badge
     const badge  = document.getElementById('densityBadge');
     const colors = {
@@ -427,8 +531,40 @@
   }
 
   function updateProgress(frame, total, pct) {
-    document.getElementById('progressBar').style.width = `${pct}%`;
-    document.getElementById('progressText').textContent = `${pct}% (${frame}/${total} frames)`;
+    // Glowing bar + pct
+    const fill = document.getElementById('progressBarFill');
+    const pctEl = document.getElementById('progressPct');
+    if (fill)  fill.style.width = `${pct}%`;
+    if (pctEl) {
+      pctEl.textContent = `${pct}%`;
+      pctEl.style.color = pct > 70 ? '#22c55e' : pct > 30 ? '#f59e0b' : '#60a5fa';
+    }
+
+    // Frame counters
+    const left = Math.max(total - frame, 0);
+    const fdEl = document.getElementById('pcFramesDone');
+    const flEl = document.getElementById('pcFramesLeft');
+    const ftEl = document.getElementById('pcFramesTotal');
+    if (fdEl) fdEl.textContent = frame.toLocaleString();
+    if (flEl) flEl.textContent = left.toLocaleString();
+    if (ftEl) ftEl.textContent = total > 0 ? total.toLocaleString() : '—';
+
+    // ETA and elapsed
+    if (processingStartTime) {
+      const elapsedSec = Math.round((Date.now() - processingStartTime) / 1000);
+      const elEl = document.getElementById('pcElapsed');
+      const etEl = document.getElementById('pcEta');
+      if (elEl) elEl.textContent = `${elapsedSec}s elapsed`;
+      if (etEl && frame > 0 && left > 0) {
+        const secPerFrame = elapsedSec / frame;
+        const etaSec = Math.round(secPerFrame * left);
+        etEl.textContent = etaSec < 60
+          ? `~${etaSec}s left`
+          : `~${Math.ceil(etaSec / 60)}min left`;
+      } else if (etEl && left === 0) {
+        etEl.textContent = 'Almost done...';
+      }
+    }
   }
 
   function updateChart() {
