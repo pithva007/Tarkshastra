@@ -182,7 +182,9 @@ class VisionProcessor:
         self.current_corridor = None
         self.progress = 0
         self.result = None
-        # track independently so _fallback also has correct total
+        # expose to status endpoint
+        self.frames_processed = 0
+        self.total_frames_to_process = 1  # set before thread starts
         self._total_frames = 1
         self._counter = None
         self._alert_triggered_this_session = False
@@ -193,6 +195,8 @@ class VisionProcessor:
         self.current_corridor = None
         self.progress = 0
         self.result = None
+        self.frames_processed = 0
+        self.total_frames_to_process = 1
         self._total_frames = 1
         self._counter = None
         self._alert_triggered_this_session = False
@@ -244,6 +248,8 @@ class VisionProcessor:
             self._total_frames = max(
                 info["total_frames"] // FRAME_SKIP, 1
             )
+            self.total_frames_to_process = self._total_frames
+            self.frames_processed = 0
             print(
                 f"[VISION] {corridor}: {info['total_frames']} frames "
                 f"@ {info['fps']:.0f}fps  "
@@ -255,6 +261,8 @@ class VisionProcessor:
         except Exception as probe_err:
             print(f"[VISION] Probe failed: {probe_err}")
             self._total_frames = 100  # fallback
+            self.total_frames_to_process = 100
+            self.frames_processed = 0
 
         try:
             counter = self._get_counter()
@@ -273,6 +281,7 @@ class VisionProcessor:
             def frame_callback(frame_result):
                 """Called on each processed frame (inside thread)."""
                 processed_counter[0] += 1
+                self.frames_processed = processed_counter[0]  # expose to status
 
                 # Progress based on frames we've actually processed
                 self.progress = min(

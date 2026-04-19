@@ -864,6 +864,10 @@ export default function App() {
           from { transform: rotate(0deg); }
           to { transform: rotate(360deg); }
         }
+        @keyframes shimmer {
+          0%   { transform: translateX(-100%); }
+          100% { transform: translateX(200%); }
+        }
         @media (max-width: 768px) {
           header div[style*="display: flex"] {
             flex-wrap: wrap;

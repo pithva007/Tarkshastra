@@ -1653,12 +1653,18 @@ async def process_vision_video(
 @app.get("/api/vision/status")
 async def vision_status():
     """Get current vision processing status."""
+    frames_done  = getattr(vision_processor, "frames_processed", 0)
+    frames_total = getattr(vision_processor, "total_frames_to_process", 1)
+    frames_left  = max(frames_total - frames_done, 0)
     return {
-        "processing": vision_processor.processing,
-        "current_corridor": vision_processor.current_corridor,
-        "progress": vision_processor.progress,
-        "active_readings": get_all_vision_readings(),
-        "calibration": CORRIDOR_CALIBRATION
+        "processing":           vision_processor.processing,
+        "current_corridor":     vision_processor.current_corridor,
+        "progress":             vision_processor.progress,
+        "frames_processed":     frames_done,
+        "total_frames":         frames_total,
+        "frames_remaining":     frames_left,
+        "active_readings":      get_all_vision_readings(),
+        "calibration":          CORRIDOR_CALIBRATION
     }
 
 

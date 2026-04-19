@@ -20,12 +20,18 @@ export default function VisionUpload({
   const [file, setFile] = useState(null)
   const [uploading, setUploading] = useState(false)
   const [processing, setProcessing] = useState(false)
-  const [progress, setProgress] = useState(0)
-  const [liveCount, setLiveCount] = useState(null)
-  const [flowRate, setFlowRate] = useState(null)
-  const [result, setResult] = useState(null)
-  const [error, setError] = useState('')
-  const [status, setStatus] = useState('')
+  const [progress,       setProgress]       = useState(0)
+  const [liveCount,      setLiveCount]      = useState(null)
+  const [flowRate,       setFlowRate]       = useState(null)
+  const [result,         setResult]         = useState(null)
+  const [error,          setError]          = useState('')
+  const [status,         setStatus]         = useState('')
+
+  // Frame-level progress for the detailed bar
+  const [framesProcessed, setFramesProcessed] = useState(0)
+  const [framesTotal,     setFramesTotal]     = useState(0)
+  const [liveCpiLive,     setLiveCpiLive]     = useState(null)  // live while processing
+  const [startTime,       setStartTime]       = useState(null)  // when processing began
 
   // Vision CPI for alert trigger
   const [visionCpi, setVisionCpi] = useState(null)
@@ -41,12 +47,14 @@ export default function VisionUpload({
     if (processing) {
       interval = setInterval(async () => {
         try {
-          const res = await fetch(`${API}/api/vision/status`)
+          const res  = await fetch(`${API}/api/vision/status`)
           const data = await res.json()
 
           if (!data.processing && processing) {
+            // Done!
             setProcessing(false)
             setProgress(100)
+            setFramesProcessed(data.frames_processed || data.total_frames || 0)
 
             const reading = data.active_readings[corridor]
             if (reading) {
@@ -54,23 +62,35 @@ export default function VisionUpload({
               setLiveCount(reading.live_count)
               setVisionCpi(reading.cpi_from_vision || 0)
               setVisionFlowRate(reading.flow_rate)
+              setLiveCpiLive(null)
               setStatus('Vision data active — CPI updating')
-
-              if (onVisionData) {
-                onVisionData({ corridor, ...reading })
-              }
+              if (onVisionData) onVisionData({ corridor, ...reading })
             }
             clearInterval(interval)
+
           } else if (data.processing) {
-            setProgress(data.progress || 0)
-            if (data.progress > 0) {
-              setStatus(`Analysing frames — ${data.progress}% complete`)
+            const pct   = data.progress || 0
+            const done  = data.frames_processed  || 0
+            const total = data.total_frames       || 0
+
+            setProgress(pct)
+            setFramesProcessed(done)
+            setFramesTotal(total)
+
+            // also pick up live readings as they stream in
+            const reading = data.active_readings?.[corridor]
+            if (reading) {
+              setLiveCpiLive(reading.cpi_from_vision || 0)
+              setFlowRate(reading.flow_rate || null)
+              setLiveCount(reading.live_count || null)
             }
+
+            setStatus(`Analysing — ${pct}% complete`)
           }
         } catch (e) {
           console.error('[VISION STATUS]', e)
         }
-      }, 2000)
+      }, 1000)  // poll every 1s for snappier updates
     }
 
     return () => clearInterval(interval)
@@ -87,6 +107,10 @@ export default function VisionUpload({
     setVisionCpi(null)
     setVisionFlowRate(null)
     setTriggerResult(null)
+    setFramesProcessed(0)
+    setFramesTotal(0)
+    setLiveCpiLive(null)
+    setStartTime(Date.now())
 
     try {
       const formData = new FormData()
@@ -518,36 +542,173 @@ export default function VisionUpload({
             </div>
           </div>
 
-          {/* Progress bar */}
-          {processing && (
-            <div style={{ marginBottom: '14px' }}>
-              <div style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                marginBottom: '6px',
-                fontSize: '12px',
-                color: '#94a3b8'
-              }}>
-                <span>{status || 'Processing video...'}</span>
-                <span>{progress}%</span>
-              </div>
+          {/* ── Rich progress panel ── */}
+          {processing && (() => {
+            const framesLeft = Math.max(framesTotal - framesProcessed, 0)
+            // ETA: based on elapsed time and frames done
+            let etaLabel = ''
+            if (startTime && framesProcessed > 0 && framesLeft > 0) {
+              const elapsedSec = (Date.now() - startTime) / 1000
+              const secPerFrame = elapsedSec / framesProcessed
+              const etaSec = Math.round(secPerFrame * framesLeft)
+              if (etaSec < 60) etaLabel = `~${etaSec}s left`
+              else etaLabel = `~${Math.ceil(etaSec / 60)}min left`
+            }
+            const elapsedLabel = startTime
+              ? `${Math.round((Date.now() - startTime) / 1000)}s elapsed`
+              : ''
 
+            return (
               <div style={{
-                height: '6px',
-                background: '#334155',
-                borderRadius: '3px',
-                overflow: 'hidden'
+                background: '#0f172a',
+                border: '1px solid #334155',
+                borderRadius: '10px',
+                padding: '14px',
+                marginBottom: '14px'
               }}>
+                {/* Top row: label + pct */}
                 <div style={{
-                  width: `${progress}%`,
-                  height: '100%',
-                  background: '#3B82F6',
-                  borderRadius: '3px',
-                  transition: 'width 0.3s'
-                }} />
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  marginBottom: '10px'
+                }}>
+                  <div style={{
+                    fontSize: '12px',
+                    fontWeight: '600',
+                    color: '#60a5fa',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px'
+                  }}>
+                    <svg width="12" height="12" viewBox="0 0 24 24"
+                         fill="none" stroke="#60a5fa" strokeWidth="2"
+                         style={{ animation: 'spin 1.4s linear infinite' }}>
+                      <path d="M12 2a10 10 0 0 1 10 10"/>
+                      <circle cx="12" cy="12" r="10" strokeOpacity="0.2"/>
+                    </svg>
+                    YOLOv8 Analysing
+                  </div>
+                  <span style={{
+                    fontSize: '16px',
+                    fontWeight: '700',
+                    color: progress > 70 ? '#22c55e' : progress > 30 ? '#f59e0b' : '#60a5fa',
+                    fontFamily: 'monospace'
+                  }}>
+                    {progress}%
+                  </span>
+                </div>
+
+                {/* Segmented progress bar */}
+                <div style={{
+                  height: '8px',
+                  background: '#1e293b',
+                  borderRadius: '4px',
+                  overflow: 'hidden',
+                  marginBottom: '10px',
+                  position: 'relative'
+                }}>
+                  <div style={{
+                    width: `${progress}%`,
+                    height: '100%',
+                    background: 'linear-gradient(90deg, #3b82f6, #60a5fa)',
+                    borderRadius: '4px',
+                    transition: 'width 0.8s ease',
+                    boxShadow: '0 0 8px #3b82f680'
+                  }}/>
+                  {/* Shimmer overlay */}
+                  <div style={{
+                    position: 'absolute',
+                    top: 0, left: 0,
+                    width: '100%', height: '100%',
+                    background: 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.15) 50%, transparent 100%)',
+                    animation: 'shimmer 1.5s infinite',
+                    borderRadius: '4px'
+                  }}/>
+                </div>
+
+                {/* Frame counters row */}
+                <div style={{
+                  display: 'grid',
+                  gridTemplateColumns: '1fr 1fr 1fr',
+                  gap: '8px',
+                  marginBottom: framesTotal > 0 ? '10px' : 0
+                }}>
+                  {[
+                    { label: 'Frames read',      value: framesProcessed.toLocaleString(), color: '#22c55e' },
+                    { label: 'Frames left',       value: framesLeft.toLocaleString(),      color: '#f59e0b' },
+                    { label: 'Total to process',  value: framesTotal > 0 ? framesTotal.toLocaleString() : '—', color: '#94a3b8' }
+                  ].map(item => (
+                    <div key={item.label} style={{
+                      background: '#1e293b',
+                      borderRadius: '6px',
+                      padding: '8px',
+                      textAlign: 'center'
+                    }}>
+                      <div style={{
+                        fontSize: '15px',
+                        fontWeight: '700',
+                        color: item.color,
+                        fontFamily: 'monospace'
+                      }}>{item.value}</div>
+                      <div style={{
+                        fontSize: '10px',
+                        color: '#64748b',
+                        marginTop: '2px'
+                      }}>{item.label}</div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Live reading while processing + timing */}
+                <div style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  flexWrap: 'wrap',
+                  gap: '6px'
+                }}>
+                  <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+                    {liveCount !== null && (
+                      <span style={{ fontSize: '11px', color: '#60a5fa' }}>
+                        👤 {liveCount} people visible
+                      </span>
+                    )}
+                    {liveCpiLive !== null && (
+                      <span style={{
+                        fontSize: '11px',
+                        color: liveCpiLive >= 0.85 ? '#ef4444'
+                             : liveCpiLive >= 0.70 ? '#f59e0b'
+                             : '#22c55e'
+                      }}>
+                        CPI {liveCpiLive.toFixed(3)}
+                      </span>
+                    )}
+                    {flowRate !== null && (
+                      <span style={{ fontSize: '11px', color: '#94a3b8' }}>
+                        Flow {flowRate}/min
+                      </span>
+                    )}
+                  </div>
+                  <div style={{
+                    fontSize: '11px',
+                    color: '#475569',
+                    display: 'flex',
+                    gap: '8px'
+                  }}>
+                    {elapsedLabel && <span>{elapsedLabel}</span>}
+                    {etaLabel && (
+                      <span style={{ color: '#60a5fa', fontWeight: '600' }}>
+                        {etaLabel}
+                      </span>
+                    )}
+                  </div>
+                </div>
               </div>
-            </div>
-          )}
+            )
+          })()}
+
+
 
           {error && (
             <div style={{
