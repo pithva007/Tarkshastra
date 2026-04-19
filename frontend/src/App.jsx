@@ -57,6 +57,7 @@ export default function App() {
   // Using ref so it persists without causing re-renders
   const dismissedAlerts = useRef(new Set())
   const repliedAlerts = useRef(new Set())
+  const activeAlertIdRef = useRef(null)  // ref mirror of activeAlert.alert_id to avoid effect loops
 
   // Current active modal state
   const [activeAlert, setActiveAlert] = useState(null)
@@ -74,39 +75,35 @@ export default function App() {
 
   // Handle alert reply requirement
   useEffect(() => {
-    // Watch for new alerts from WebSocket data
-    const checkForAlerts = () => {
-      if (!corridorData) return
+    if (!corridorData) return
 
-      Object.values(corridorData).forEach(data => {
-        if (!data?.alert_active || !data?.alert_id) return
+    Object.values(corridorData).forEach(data => {
+      if (!data?.alert_active || !data?.alert_id) return
 
-        const alertId = data.alert_id
+      const alertId = data.alert_id
 
-        // Skip if already dismissed or replied
-        if (dismissedAlerts.current.has(alertId)) return
-        if (repliedAlerts.current.has(alertId)) return
+      // Skip if already dismissed or replied
+      if (dismissedAlerts.current.has(alertId)) return
+      if (repliedAlerts.current.has(alertId)) return
 
-        // Skip if modal already showing this exact alert
-        if (activeAlert?.alert_id === alertId) return
+      // Skip if modal already showing this exact alert (use ref — no re-render loop)
+      if (activeAlertIdRef.current === alertId) return
 
-        // This is a NEW alert — show modal
-        console.log('[ALERT] New alert detected:', alertId)
-        setActiveAlert({
-          alert_id: alertId,
-          corridor: data.corridor,
-          cpi: data.cpi,
-          surge_type: data.surge_type,
-          time_to_breach_minutes: data.time_to_breach_minutes,
-          ml_confidence: data.ml_confidence,
-          flow_rate: data.flow_rate
-        })
-        setShowAlertModal(true)
+      // This is a NEW alert — show modal
+      console.log('[ALERT] New alert detected:', alertId)
+      activeAlertIdRef.current = alertId
+      setActiveAlert({
+        alert_id: alertId,
+        corridor: data.corridor,
+        cpi: data.cpi,
+        surge_type: data.surge_type,
+        time_to_breach_minutes: data.time_to_breach_minutes,
+        ml_confidence: data.ml_confidence,
+        flow_rate: data.flow_rate
       })
-    }
-
-    checkForAlerts()
-  }, [corridorData, activeAlert])
+      setShowAlertModal(true)
+    })
+  }, [corridorData])  // ← removed activeAlert from deps; use ref instead
 
   // Handle WebSocket messages for alert resolution, PDF ready, and call updates
   useEffect(() => {
@@ -119,6 +116,7 @@ export default function App() {
         // Alert is officially resolved — update UI
         setActiveAlert(prev => {
           if (prev?.alert_id === data.alert_id) {
+            activeAlertIdRef.current = null
             return null  // Clear active alert
           }
           return prev
