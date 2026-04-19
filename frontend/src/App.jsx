@@ -105,7 +105,7 @@ export default function App() {
     }
 
     checkForAlerts()
-  }, [corridorData, activeAlert])  // Only runs when corridorData changes
+  }, [corridorData, activeAlert])
 
   // Handle WebSocket messages for alert resolution, PDF ready, and call updates
   useEffect(() => {
@@ -129,12 +129,10 @@ export default function App() {
       }
 
       if (data.type === 'pdf_ready') {
-        // PDF notification is already handled by useNotifications hook
         console.log('[PDF READY]', data.corridor, data.alert_id)
       }
 
       if (data.type === 'call_update') {
-        // Call update notification
         const calledRoles = data.calls
           .filter(c => c.status === 'calling')
           .map(c => c.role)
@@ -146,16 +144,14 @@ export default function App() {
       }
 
       if (data.type === 'vision_progress') {
-        console.log('[VISION PROGRESS]', 
-          data.corridor, 
-          data.progress + '%', 
+        console.log('[VISION PROGRESS]',
+          data.corridor,
+          data.progress + '%',
           'count:', data.live_count)
       }
 
       if (data.type === 'vision_complete') {
         console.log('[VISION COMPLETE]', data.result)
-        // Vision complete is already logged — useNotifications handles alert_active
-        // notifications automatically from corridorData
       }
 
       if (data.type === 'vision_started') {
@@ -171,7 +167,6 @@ export default function App() {
   useEffect(() => {
     notifications.forEach(notification => {
       if (notification.type === 'pdf_ready' && !notification.read) {
-        // Auto-mark as read and show banner
         markRead(notification.id)
       }
     })
@@ -426,48 +421,87 @@ export default function App() {
             flexWrap: 'wrap'
           }}>
             {['Ambaji', 'Dwarka', 'Somnath', 'Pavagadh'].map(corridor => {
-              const data = corridorData[corridor]
-              const cpi = data?.cpi || 0
-              const isSelected = selectedCorridor === corridor
-              
-              const getBorderColor = () => {
-                if (cpi >= 0.85) return '#ef4444'
-                if (cpi >= 0.70) return '#f59e0b'
-                if (cpi >= 0.40) return '#22c55e'
-                return '#334155'
-              }
+              const data = corridorData[corridor] || {}
+              const cpi = data.cpi || 0
+              const isAlert = ['ACTIVE', 'ACKNOWLEDGED', 'RESOLVING'].includes(
+                data.alert_lifecycle_state
+              )
+              const isVision = data.vision_active === true
+
+              const borderColor = isAlert
+                ? '#ef4444'
+                : cpi >= 0.70
+                ? '#f59e0b'
+                : cpi >= 0.40
+                ? '#22c55e'
+                : '#334155'
+
+              const cpiColor = cpi >= 0.70
+                ? '#ef4444'
+                : cpi >= 0.40
+                ? '#f59e0b'
+                : '#22c55e'
 
               return (
                 <button
                   key={corridor}
                   onClick={() => setSelectedCorridor(corridor)}
                   style={{
-                    flex: '1',
+                    flex: 1,
                     minWidth: '120px',
-                    padding: '16px',
-                    background: isSelected ? '#1e293b' : '#0f172a',
-                    border: `2px solid ${isSelected ? accentColor : getBorderColor()}`,
-                    borderRadius: '12px',
-                    color: '#f1f5f9',
+                    padding: '14px',
+                    background: selectedCorridor === corridor
+                      ? `${borderColor}15`
+                      : '#0f172a',
+                    border: `1.5px solid ${borderColor}`,
+                    borderRadius: '10px',
                     cursor: 'pointer',
                     textAlign: 'center',
+                    animation: isAlert ? 'pulse 2s infinite' : 'none',
                     transition: 'all 0.2s ease'
                   }}
                 >
                   <div style={{
-                    fontSize: '16px',
+                    fontSize: '14px',
                     fontWeight: '600',
+                    color: '#f1f5f9',
                     marginBottom: '4px'
                   }}>
                     {corridor}
                   </div>
                   <div style={{
-                    fontSize: '14px',
-                    fontFamily: 'monospace',
-                    color: cpi >= 0.85 ? '#ef4444' : cpi >= 0.70 ? '#f59e0b' : '#22c55e'
+                    fontSize: '13px',
+                    fontWeight: '600',
+                    color: cpiColor,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '6px'
                   }}>
                     CPI {cpi.toFixed(3)}
+                    {isVision && (
+                      <span style={{
+                        fontSize: '9px',
+                        background: '#14532d',
+                        color: '#86efac',
+                        padding: '1px 5px',
+                        borderRadius: '3px',
+                        fontWeight: '700'
+                      }}>
+                        VISION
+                      </span>
+                    )}
                   </div>
+                  {isAlert && (
+                    <div style={{
+                      fontSize: '10px',
+                      color: '#ef4444',
+                      marginTop: '3px',
+                      fontWeight: '600'
+                    }}>
+                      {data.alert_lifecycle_state}
+                    </div>
+                  )}
                 </button>
               )
             })}
@@ -506,10 +540,32 @@ export default function App() {
                 gap: '16px'
               }}>
                 {[
-                  { label: 'Flow Rate', value: `${Math.round(corridorData[selectedCorridor]?.flow_rate || 0)}/min`, color: '#3b82f6' },
-                  { label: 'Transport Burst', value: (corridorData[selectedCorridor]?.transport_burst || 0).toFixed(3), color: '#f59e0b' },
-                  { label: 'Chokepoint Density', value: (corridorData[selectedCorridor]?.chokepoint_density || 0).toFixed(3), color: '#8b5cf6' },
-                  { label: 'Time to Breach', value: corridorData[selectedCorridor]?.time_to_breach_minutes ? `${Math.round(corridorData[selectedCorridor].time_to_breach_minutes)}min` : '—', color: '#ef4444' }
+                  {
+                    label: 'Flow Rate',
+                    value: `${Math.round(corridorData[selectedCorridor]?.flow_rate || 0)}/min`,
+                    color: '#3b82f6',
+                    sub: corridorData[selectedCorridor]?.vision_active ? 'VISION' : null
+                  },
+                  {
+                    label: 'Transport Burst',
+                    value: (corridorData[selectedCorridor]?.transport_burst || 0).toFixed(3),
+                    color: '#f59e0b',
+                    sub: null
+                  },
+                  {
+                    label: 'Chokepoint Density',
+                    value: (corridorData[selectedCorridor]?.chokepoint_density || 0).toFixed(3),
+                    color: '#8b5cf6',
+                    sub: null
+                  },
+                  {
+                    label: 'Time to Breach',
+                    value: corridorData[selectedCorridor]?.time_to_breach_minutes
+                      ? `${Math.round(corridorData[selectedCorridor].time_to_breach_minutes)}min`
+                      : '—',
+                    color: '#ef4444',
+                    sub: null
+                  }
                 ].map(metric => (
                   <div key={metric.label} style={{
                     background: '#1e293b',
@@ -522,9 +578,24 @@ export default function App() {
                       color: '#94a3b8',
                       marginBottom: '8px',
                       textTransform: 'uppercase',
-                      fontWeight: '500'
+                      fontWeight: '500',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px'
                     }}>
                       {metric.label}
+                      {metric.sub && (
+                        <span style={{
+                          fontSize: '9px',
+                          background: '#14532d',
+                          color: '#86efac',
+                          padding: '1px 4px',
+                          borderRadius: '3px',
+                          fontWeight: '700'
+                        }}>
+                          {metric.sub}
+                        </span>
+                      )}
                     </div>
                     <div style={{
                       fontSize: '20px',
@@ -613,7 +684,6 @@ export default function App() {
             }}>
               Active alerts and response status for all corridors.
             </p>
-            {/* Alert management content would go here */}
           </div>
         )}
 
@@ -656,7 +726,6 @@ export default function App() {
               gap: '16px'
             }}>
               {busData.map(bus => {
-                // Get corridor data for THIS bus's destination, not selected corridor
                 const busCorridorData = corridorData[bus.destination] || {
                   cpi: 0,
                   surge_type: 'SAFE',
@@ -718,7 +787,6 @@ export default function App() {
                       Speed: {bus.speed_kmh} km/h
                     </div>
                     
-                    {/* Show crush risk for this bus's destination */}
                     {busCorridorData.cpi >= 0.70 && busCorridorData.time_to_breach_minutes < 999 && (
                       <div style={{
                         marginTop: '12px',
@@ -729,7 +797,7 @@ export default function App() {
                         fontSize: '12px',
                         fontWeight: '600'
                       }}>
-                        ⚠ Crush risk in {Math.round(busCorridorData.time_to_breach_minutes)} min at {bus.destination}
+                        Crush risk in {Math.round(busCorridorData.time_to_breach_minutes)} min at {bus.destination}
                       </div>
                     )}
                     
@@ -786,8 +854,16 @@ export default function App() {
         />
       )}
 
-      {/* Mobile responsive styles */}
-      <style jsx>{`
+      {/* Pulse animation for alert cards */}
+      <style>{`
+        @keyframes pulse {
+          0%, 100% { opacity: 1; }
+          50% { opacity: 0.75; }
+        }
+        @keyframes spin {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
+        }
         @media (max-width: 768px) {
           header div[style*="display: flex"] {
             flex-wrap: wrap;
@@ -804,10 +880,6 @@ export default function App() {
           
           div[style*="flex-wrap: wrap"] {
             flex-direction: column;
-          }
-          
-          div[style*="minWidth: '120px'"] {
-            min-width: auto !important;
           }
         }
       `}</style>

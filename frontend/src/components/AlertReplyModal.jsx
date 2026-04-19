@@ -117,10 +117,10 @@ export default function AlertReplyModal({ alert, agency, token, onClose, onRepli
     return () => clearInterval(interval)
   }, [submitted, alert?.alert_id])
 
-  const timerColor = timeLeft > 30 
-    ? '#22c55e' 
-    : timeLeft > 10 
-    ? '#F59E0B' 
+  const timerColor = timeLeft > 30
+    ? '#22c55e'
+    : timeLeft > 10
+    ? '#F59E0B'
     : '#EF4444'
 
   const formatTime = (s) => {
@@ -153,11 +153,6 @@ export default function AlertReplyModal({ alert, agency, token, onClose, onRepli
 
       setSubmitted(true)
 
-      // Close and notify parent after 1.5 seconds
-      setTimeout(() => {
-        onReplied()
-      }, 1500)
-
     } catch (err) {
       console.error('[REPLY] Error:', err)
       setError(err.response?.data?.detail || 'Failed to submit. Check connection.')
@@ -174,11 +169,12 @@ export default function AlertReplyModal({ alert, agency, token, onClose, onRepli
         padding: '2rem',
         width: '100%',
         maxWidth: '520px',
-        textAlign: 'center'
+        textAlign: 'center',
+        border: '1px solid #334155'
       }}>
         <div style={{
-          width: '56px', 
-          height: '56px',
+          width: '52px',
+          height: '52px',
           background: '#14532d',
           borderRadius: '50%',
           display: 'flex',
@@ -186,44 +182,105 @@ export default function AlertReplyModal({ alert, agency, token, onClose, onRepli
           justifyContent: 'center',
           margin: '0 auto 1rem'
         }}>
-          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#22c55e" strokeWidth="2.5">
+          <svg width="26" height="26"
+               viewBox="0 0 24 24"
+               fill="none"
+               stroke="#22c55e"
+               strokeWidth="2.5">
             <path d="M20 6L9 17l-5-5"/>
           </svg>
         </div>
 
         <div style={{
-          fontSize: '18px',
+          fontSize: '17px',
           fontWeight: '600',
           color: '#f1f5f9',
-          marginBottom: '8px'
+          marginBottom: '6px'
         }}>
           Reply Submitted
         </div>
 
         <div style={{
-          fontSize: '13px',
-          color: '#94a3b8',
-          marginBottom: '1rem'
+          fontSize: '12px',
+          color: '#64748b',
+          marginBottom: '1.5rem'
         }}>
-          Response logged for Alert {alert.alert_id}
+          Response logged for alert{' '}
+          {alert?.alert_id}
         </div>
 
+        {/* PDF Download button — only on click */}
         <button
-          onClick={() => {
-            const url = `${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/api/report/${alert.alert_id}`
-            window.open(url, '_blank')
+          onClick={async () => {
+            const base =
+              import.meta.env.VITE_API_URL ||
+              'http://localhost:8000'
+            const url = `${base}/api/report/${alert?.alert_id}`
+            try {
+              const res = await fetch(url)
+              // Check content type — backend may return JSON if PDF not ready yet
+              const contentType = res.headers.get('content-type') || ''
+              if (contentType.includes('application/pdf')) {
+                const blob = await res.blob()
+                const blobUrl = URL.createObjectURL(blob)
+                const a = document.createElement('a')
+                a.href = blobUrl
+                a.download = `incident_report_${alert?.alert_id}.pdf`
+                document.body.appendChild(a)
+                a.click()
+                document.body.removeChild(a)
+                setTimeout(() => URL.revokeObjectURL(blobUrl), 5000)
+              } else {
+                // PDF not generated yet — open JSON report in new tab as fallback
+                window.open(url, '_blank')
+              }
+            } catch (e) {
+              window.open(url, '_blank')
+            }
           }}
           style={{
-            background: '#1e3a5f',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '8px',
+            width: '100%',
+            padding: '10px',
+            background: '#0f172a',
             color: '#60a5fa',
-            border: '1px solid #3B82F6',
+            border: '1px solid #1e3a5f',
             borderRadius: '8px',
-            padding: '8px 16px',
+            fontSize: '13px',
+            fontWeight: '500',
+            cursor: 'pointer',
+            marginBottom: '10px'
+          }}
+        >
+          <svg width="14" height="14"
+               viewBox="0 0 24 24"
+               fill="none"
+               stroke="currentColor"
+               strokeWidth="2">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+            <path d="M7 10l5 5 5-5"/>
+            <path d="M12 15V3"/>
+          </svg>
+          Download Incident Report PDF
+        </button>
+
+        <button
+          onClick={onReplied}
+          style={{
+            width: '100%',
+            padding: '8px',
+            background: 'transparent',
+            color: '#64748b',
+            border: '1px solid #334155',
+            borderRadius: '8px',
             fontSize: '13px',
             cursor: 'pointer'
           }}
         >
-          View Incident Report PDF
+          Close
         </button>
       </div>
     )
@@ -339,11 +396,11 @@ export default function AlertReplyModal({ alert, agency, token, onClose, onRepli
               key={opt.value}
               onClick={() => setStatus(opt.value)}
               style={{
-                background: status === opt.value 
-                  ? `${opt.color}18` 
+                background: status === opt.value
+                  ? `${opt.color}18`
                   : '#0f172a',
-                border: `1.5px solid ${status === opt.value 
-                  ? opt.color 
+                border: `1.5px solid ${status === opt.value
+                  ? opt.color
                   : '#334155'}`,
                 borderRadius: '8px',
                 padding: '10px 12px',
@@ -352,8 +409,8 @@ export default function AlertReplyModal({ alert, agency, token, onClose, onRepli
                 display: 'flex',
                 alignItems: 'flex-start',
                 gap: '8px',
-                color: status === opt.value 
-                  ? opt.color 
+                color: status === opt.value
+                  ? opt.color
                   : '#94a3b8',
                 transition: 'all 0.15s'
               }}

@@ -22,7 +22,12 @@ export function useWebSocket() {
   const retryTimer    = useRef(null)
   const retryCount    = useRef(0)
 
-  const [corridorData,    setCorridorData]    = useState({})
+  const [corridorData, setCorridorData] = useState({
+    Ambaji:   {},
+    Dwarka:   {},
+    Somnath:  {},
+    Pavagadh: {}
+  })
   const [corridorHistory, setCorridorHistory] = useState(
     () => Object.fromEntries(CORRIDORS.map((c) => [c, []]))
   )
@@ -47,7 +52,7 @@ export function useWebSocket() {
 
     ws.onopen = () => {
       if (unmounted.current) { ws.close(); return }
-      console.log('WebSocket connected ✓')
+      console.log('WebSocket connected')
       retryDelay.current = 1000
       retryCount.current = 0
       setConnectionStatus('connected')
@@ -65,7 +70,48 @@ export function useWebSocket() {
       if (parsed.type === 'ping') return
 
       if (parsed.type === 'cpi_update' && parsed.corridor) {
-        applyReading(parsed)
+        // Store data for this corridor
+        setCorridorData(prev => ({
+          ...prev,
+          [parsed.corridor]: {
+            cpi: parsed.cpi,
+            flow_rate: parsed.flow_rate,
+            transport_burst: parsed.transport_burst,
+            chokepoint_density: parsed.chokepoint_density,
+            surge_type: parsed.surge_type,
+            corridor_state: parsed.corridor_state,
+            time_to_breach_seconds: parsed.time_to_breach_seconds,
+            time_to_breach_minutes: parsed.time_to_breach_minutes,
+            alert_active: parsed.alert_active,
+            alert_id: parsed.alert_id,
+            ml_confidence: parsed.ml_confidence,
+            ml_risk_level: parsed.ml_risk_level,
+            alert_lifecycle_state: parsed.alert_lifecycle_state,
+            alert_acknowledged_by: parsed.alert_acknowledged_by || [],
+            alert_duration_minutes: parsed.alert_duration_minutes || 0,
+            data_source: parsed.data_source,
+            vision_active: parsed.vision_active,
+            vision_count: parsed.vision_count,
+            corridor: parsed.corridor,
+            timestamp: parsed.timestamp
+          }
+        }))
+
+        // Update history for charts
+        setCorridorHistory(prev => {
+          const key = parsed.corridor
+          const existing = prev[key] || []
+          const updated = [
+            ...existing,
+            {
+              time: new Date().toLocaleTimeString(),
+              cpi: parsed.cpi,
+              flow_rate: parsed.flow_rate
+            }
+          ].slice(-MAX_HISTORY)  // keep last 60 readings
+          return { ...prev, [key]: updated }
+        })
+
         setLastUpdate(new Date())
         return
       }
@@ -85,7 +131,7 @@ export function useWebSocket() {
       }
 
       // Forward other message types to window for App.jsx to handle
-      if (['alert_resolved', 'pdf_ready', 'call_update', 'vision_progress', 'vision_complete', 'vision_started'].includes(parsed.type)) {
+      if (['alert_resolved', 'pdf_ready', 'call_update', 'vision_progress', 'vision_complete', 'vision_started', 'replies_update', 'ack_timer_started', 'ack_timeout', 'call_suppressed'].includes(parsed.type)) {
         window.dispatchEvent(new CustomEvent('ws_message', { detail: parsed }))
       }
     }
@@ -103,10 +149,38 @@ export function useWebSocket() {
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   function applyReading(reading) {
-    setCorridorData((prev) => ({ ...prev, [reading.corridor]: reading }))
+    setCorridorData((prev) => ({
+      ...prev,
+      [reading.corridor]: {
+        cpi: reading.cpi,
+        flow_rate: reading.flow_rate,
+        transport_burst: reading.transport_burst,
+        chokepoint_density: reading.chokepoint_density,
+        surge_type: reading.surge_type,
+        corridor_state: reading.corridor_state,
+        time_to_breach_seconds: reading.time_to_breach_seconds,
+        time_to_breach_minutes: reading.time_to_breach_minutes,
+        alert_active: reading.alert_active,
+        alert_id: reading.alert_id,
+        ml_confidence: reading.ml_confidence,
+        ml_risk_level: reading.ml_risk_level,
+        alert_lifecycle_state: reading.alert_lifecycle_state,
+        alert_acknowledged_by: reading.alert_acknowledged_by || [],
+        alert_duration_minutes: reading.alert_duration_minutes || 0,
+        data_source: reading.data_source,
+        vision_active: reading.vision_active,
+        vision_count: reading.vision_count,
+        corridor: reading.corridor,
+        timestamp: reading.timestamp
+      }
+    }))
     setCorridorHistory((prev) => {
       const existing = prev[reading.corridor] || []
-      const entry = { cpi: reading.cpi, t: new Date().toLocaleTimeString() }
+      const entry = {
+        time: new Date().toLocaleTimeString(),
+        cpi: reading.cpi,
+        flow_rate: reading.flow_rate
+      }
       const updated = [...existing, entry].slice(-MAX_HISTORY)
       return { ...prev, [reading.corridor]: updated }
     })

@@ -63,6 +63,9 @@ export default function VisionUpload({
             clearInterval(interval)
           } else if (data.processing) {
             setProgress(data.progress || 0)
+            if (data.progress > 0) {
+              setStatus(`Analysing frames — ${data.progress}% complete`)
+            }
           }
         } catch (e) {
           console.error('[VISION STATUS]', e)
@@ -225,7 +228,8 @@ export default function VisionUpload({
 
       {expanded && (
         <div style={{ padding: '0 18px 18px', borderTop: '1px solid #334155' }}>
-          {/* Active vision badge */}
+
+          {/* Active vision data badge — redesigned */}
           {isActive && (
             <div style={{
               background: '#14532d',
@@ -233,107 +237,162 @@ export default function VisionUpload({
               borderRadius: '8px',
               padding: '10px 14px',
               marginTop: '14px',
-              marginBottom: '14px',
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center'
-            }}>
-              <div>
-                <div style={{ fontSize: '12px', color: '#86efac', fontWeight: '600', marginBottom: '2px' }}>
-                  Vision data active for {corridor}
-                </div>
-                <div style={{ fontSize: '12px', color: '#4ade80', display: 'flex', gap: '16px' }}>
-                  <span>Live count: {liveCount} people</span>
-                  <span>Flow rate: {flowRate} pax/min</span>
-                  {visionCpi != null && (
-                    <span>CPI: {visionCpi.toFixed(3)}</span>
-                  )}
-                </div>
-              </div>
-
-              <button
-                onClick={handleClear}
-                style={{
-                  background: 'transparent',
-                  border: '1px solid #16a34a',
-                  color: '#86efac',
-                  borderRadius: '6px',
-                  padding: '5px 10px',
-                  fontSize: '12px',
-                  cursor: 'pointer'
-                }}
-              >
-                Clear
-              </button>
-            </div>
-          )}
-
-          {/* Alert trigger block — only when vision CPI >= 0.75 */}
-          {isActive && visionCpi != null && visionCpi >= 0.75 && (
-            <div style={{
-              background: '#7f1d1d20',
-              border: '1px solid #ef444450',
-              borderRadius: '8px',
-              padding: '12px 14px',
               marginBottom: '12px'
             }}>
               <div style={{
-                fontSize: '12px',
-                color: '#fca5a5',
-                marginBottom: '8px',
                 display: 'flex',
+                justifyContent: 'space-between',
                 alignItems: 'center',
-                gap: '6px'
+                marginBottom: '8px'
               }}>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#ef4444" strokeWidth="2">
-                  <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
-                  <path d="M12 9v4M12 17h.01"/>
-                </svg>
-                Vision detected high crowd density at {corridor} — CPI {visionCpi.toFixed(3)}
-              </div>
-
-              {!triggerResult && (
-                <button
-                  onClick={triggerVisionAlert}
-                  disabled={triggering}
-                  style={{
-                    width: '100%',
-                    padding: '8px',
-                    background: '#7f1d1d',
-                    border: '1px solid #ef4444',
-                    color: '#fca5a5',
-                    borderRadius: '6px',
-                    fontSize: '12px',
-                    fontWeight: '600',
-                    cursor: triggering ? 'not-allowed' : 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: '6px',
-                    opacity: triggering ? 0.7 : 1
-                  }}
-                >
-                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
-                    <path d="M12 9v4M12 17h.01"/>
-                  </svg>
-                  {triggering ? 'Triggering...' : 'Trigger Full Alert for ' + corridor}
-                </button>
-              )}
-
-              {triggerResult && (
                 <div style={{
                   fontSize: '12px',
-                  color: triggerResult.status === 'triggered' ? '#86efac' : '#fca5a5',
-                  padding: '6px',
-                  textAlign: 'center'
+                  color: '#86efac',
+                  fontWeight: '600'
                 }}>
-                  {triggerResult.status === 'triggered'
-                    ? 'Alert triggered — agencies notified'
-                    : triggerResult.reason || 'Could not trigger alert'}
-                  {triggerResult.alert_id && (
-                    <div style={{ fontSize: '11px', color: '#64748b', marginTop: '4px' }}>
-                      Alert ID: {triggerResult.alert_id}
+                  Vision data active — {corridor}
+                </div>
+                <button
+                  onClick={handleClear}
+                  style={{
+                    background: 'transparent',
+                    border: '1px solid #16a34a',
+                    color: '#86efac',
+                    borderRadius: '4px',
+                    padding: '2px 8px',
+                    fontSize: '11px',
+                    cursor: 'pointer'
+                  }}
+                >
+                  Clear
+                </button>
+              </div>
+
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: '1fr 1fr 1fr',
+                gap: '8px',
+                marginBottom: visionCpi >= 0.75 ? '10px' : 0
+              }}>
+                {[
+                  {
+                    label: 'People counted',
+                    value: liveCount || 0,
+                    color: '#86efac'
+                  },
+                  {
+                    label: 'Flow rate',
+                    value: `${flowRate || 0}/min`,
+                    color: '#86efac'
+                  },
+                  {
+                    label: 'Vision CPI',
+                    value: visionCpi
+                      ? visionCpi.toFixed(3)
+                      : '0.000',
+                    color: visionCpi >= 0.85
+                      ? '#ef4444'
+                      : visionCpi >= 0.70
+                      ? '#f59e0b'
+                      : '#86efac'
+                  }
+                ].map(item => (
+                  <div key={item.label} style={{
+                    background: '#0f172a',
+                    borderRadius: '6px',
+                    padding: '8px',
+                    textAlign: 'center'
+                  }}>
+                    <div style={{
+                      fontSize: '16px',
+                      fontWeight: '700',
+                      color: item.color
+                    }}>
+                      {item.value}
+                    </div>
+                    <div style={{
+                      fontSize: '10px',
+                      color: '#64748b',
+                      marginTop: '2px'
+                    }}>
+                      {item.label}
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Alert trigger when vision CPI is high */}
+              {visionCpi >= 0.75 && (
+                <div style={{
+                  background: '#7f1d1d30',
+                  border: '1px solid #ef444450',
+                  borderRadius: '6px',
+                  padding: '10px'
+                }}>
+                  <div style={{
+                    fontSize: '12px',
+                    color: '#fca5a5',
+                    marginBottom: '8px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '5px'
+                  }}>
+                    <svg width="13" height="13"
+                         viewBox="0 0 24 24"
+                         fill="none"
+                         stroke="#ef4444"
+                         strokeWidth="2">
+                      <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+                      <path d="M12 9v4M12 17h.01"/>
+                    </svg>
+                    High density detected — CPI {visionCpi?.toFixed(3)}
+                  </div>
+
+                  {!triggerResult ? (
+                    <button
+                      onClick={triggerVisionAlert}
+                      disabled={triggering}
+                      style={{
+                        width: '100%',
+                        padding: '8px',
+                        background: '#7f1d1d',
+                        border: '1px solid #ef4444',
+                        color: '#fca5a5',
+                        borderRadius: '6px',
+                        fontSize: '12px',
+                        fontWeight: '600',
+                        cursor: triggering ? 'not-allowed' : 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '6px'
+                      }}
+                    >
+                      <svg width="12" height="12"
+                           viewBox="0 0 24 24"
+                           fill="none"
+                           stroke="currentColor"
+                           strokeWidth="2">
+                        <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+                        <path d="M12 9v4M12 17h.01"/>
+                      </svg>
+                      {triggering
+                        ? 'Triggering...'
+                        : `Trigger Alert — ${corridor}`
+                      }
+                    </button>
+                  ) : (
+                    <div style={{
+                      fontSize: '12px',
+                      color: triggerResult.status === 'triggered'
+                        ? '#86efac' : '#fca5a5',
+                      textAlign: 'center',
+                      padding: '6px'
+                    }}>
+                      {triggerResult.status === 'triggered'
+                        ? 'Alert triggered — all agencies notified'
+                        : triggerResult.reason
+                      }
                     </div>
                   )}
                 </div>
@@ -469,7 +528,7 @@ export default function VisionUpload({
                 fontSize: '12px',
                 color: '#94a3b8'
               }}>
-                <span>Processing video...</span>
+                <span>{status || 'Processing video...'}</span>
                 <span>{progress}%</span>
               </div>
 
@@ -486,10 +545,6 @@ export default function VisionUpload({
                   borderRadius: '3px',
                   transition: 'width 0.3s'
                 }} />
-              </div>
-
-              <div style={{ fontSize: '11px', color: '#64748b', marginTop: '4px' }}>
-                {status}
               </div>
             </div>
           )}
