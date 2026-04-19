@@ -240,7 +240,7 @@ async def handle_new_alert(data: dict):
         "time_to_breach_minutes": data["time_to_breach_minutes"],
         "ml_confidence": data["ml_confidence"],
         "message": (
-            f"🚨 RED ALERT: {corridor} — CPI {data['cpi']:.2f}. "
+            f"RED ALERT: {corridor} — CPI {data['cpi']:.2f}. "
             f"Acknowledge within 90 seconds or emergency calls will be triggered."
         ),
         "ack_deadline_seconds": 90,
@@ -285,6 +285,8 @@ async def handle_new_alert(data: dict):
         "alert_low_cpi_count": 0,
         "data_source": data.get("data_source", "simulator"),
         "vision_active": data.get("data_source") == "vision",
+        "vision_count": None,
+        "baseline_flow": data.get("flow_rate", 1400),
         "timestamp": datetime.utcnow().isoformat() + "Z",
     })
 
@@ -365,7 +367,7 @@ async def _ack_timer_and_call(
         return
 
     # ── Timer expired — no acknowledgment received → trigger calls ────────────
-    print(f"[TIMER] ⏰ {alert_id} — 90s expired, NO acknowledgment received!")
+    print(f"[TIMER] {alert_id} — 90s expired, NO acknowledgment received!")
     print(f"[TIMER] Triggering emergency calls for {corridor}...")
 
     await manager.broadcast({
@@ -373,7 +375,7 @@ async def _ack_timer_and_call(
         "alert_id": alert_id,
         "corridor": corridor,
         "message": (
-            f"⚠️ No acknowledgment received for {corridor} alert. "
+            f"No acknowledgment received for {corridor} alert. "
             f"Triggering emergency calls now."
         ),
         "timestamp": datetime.now(timezone.utc).isoformat(),
@@ -470,8 +472,6 @@ async def run_bus_simulator():
             buses = bus_message.get("buses", [])
             if buses:
                 await manager.broadcast(bus_message)
-                # Uncomment to debug:
-                # print(f"[BUS] Broadcast {len(buses)} buses")
         except Exception as e:
             print(f"[BUS BROADCAST ERROR] {e}")
         await asyncio.sleep(5)
@@ -956,8 +956,7 @@ async def simulate_scenario(data: dict):
         risk_color = "#22c55e"
     
     # Generate factor breakdown
-    # Shows how much each input contributes to CPI
-    flow_contribution   = round(normalized_flow * 0.5, 3)
+    flow_contribution      = round(normalized_flow * 0.5, 3)
     transport_contribution = round(transport * 0.3, 3)
     chokepoint_contribution = round(chokepoint * 0.2, 3)
     
@@ -1061,45 +1060,48 @@ async def simulate_scenario(data: dict):
 
 @app.post("/api/simulate/trigger-alert")
 async def simulate_trigger_alert(data: dict):
-    """Trigger a REAL alert from What-If simulator or Vision Input.
-
-    Called when user clicks 'Trigger Alert' button after seeing
-    high CPI in simulation or vision analysis.
-
-    Body: {token, corridor, cpi, flow_rate, transport_burst,
-           chokepoint_density, surge_type, ttb_minutes,
-           ml_confidence, source}
-    """
-    from auth import verify_token as _verify
-
     token = data.get("token", "")
-    session = _verify(token)
+    session = verify_token(token)
     if not session:
-        raise HTTPException(status_code=401, detail="Authentication required")
+        raise HTTPException(
+            status_code=401,
+            detail="Login required"
+        )
 
-    corridor = data.get("corridor", "Ambaji")
-    cpi = float(data.get("cpi", 0.85))
+    corridor   = data.get("corridor", "Ambaji")
+    cpi        = float(data.get("cpi", 0.85))
+    surge_type = data.get("surge_type", "GENUINE_CRUSH")
+    flow_rate  = float(data.get("flow_rate", 1400))
+    transport  = float(data.get("transport_burst", 0.75))
+    chokepoint = float(data.get("chokepoint_density", 0.80))
+    ttb_min    = float(data.get("ttb_minutes", 0))
+    ml_conf    = int(data.get("ml_confidence", 89))
+    source     = data.get("source", "simulator")
 
-    # Must be above threshold to trigger
-    if cpi < 0.75:
+    if cpi < 0.70:
         return {
             "status": "rejected",
             "reason": (
-                f"CPI {cpi:.3f} below threshold 0.75. "
-                f"Only trigger alerts for high CPI scenarios."
+                f"CPI {cpi:.3f} too low. "
+                f"Must be >= 0.70 to trigger alert."
             )
         }
 
-    # Check lifecycle — don't fire if already active
-    existing_alert_id = active_corridor_alerts.get(corridor)
-    if existing_alert_id:
+    # Generate alert ID
+    prefix = "SIM" if source == "simulator" else "VIS"
+    ts = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+    alert_id = f"{prefix}_{ts}_{corridor[:3].upper()}"
+
+    # Check if corridor already has active alert
+    existing = active_corridor_alerts.get(corridor)
+    if existing:
         return {
             "status": "skipped",
             "reason": (
-                f"{corridor} already has an active alert. "
-                f"Wait for it to resolve before triggering another."
+                f"{corridor} already has active alert. "
+                f"Wait for it to resolve."
             ),
-            "existing_alert_id": existing_alert_id
+            "existing_alert_id": existing
         }
 
     # Check cooldown
@@ -1115,42 +1117,148 @@ async def simulate_trigger_alert(data: dict):
             )
         }
 
-    # Build alert data
-    ts = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
-    source = "vision" if data.get("source") == "vision" else "simulator"
-    prefix = "VIS" if source == "vision" else "SIM"
-    ttb_minutes = float(data.get("ttb_minutes", 0))
+    # STEP 1 — Store in lifecycle immediately
+    active_corridor_alerts[corridor] = alert_id
+    called_alert_ids.add(alert_id)
 
-    alert_data = {
+    print(
+        f"[MANUAL ALERT] {corridor}: {alert_id} "
+        f"CPI:{cpi} Source:{source}"
+    )
+
+    # STEP 2 — Save to database immediately
+    # Use the helper which writes only columns guaranteed to exist;
+    # extra fields (flow_rate etc.) are added by migration if the DB
+    # already existed before this fix was deployed.
+    try:
+        async with aiosqlite.connect("stampede.db") as db:
+            await db.execute(
+                """INSERT OR IGNORE INTO alerts
+                   (alert_id, corridor, cpi, surge_type,
+                    flow_rate, transport_burst,
+                    chokepoint_density, ml_confidence,
+                    fired_at, state)
+                   VALUES (?,?,?,?,?,?,?,?,?,?)""",
+                (alert_id, corridor, cpi, surge_type,
+                 flow_rate, transport, chokepoint, ml_conf,
+                 datetime.utcnow().isoformat(), "ACTIVE")
+            )
+            await db.commit()
+    except Exception as _db_err:
+        # Fallback: write only guaranteed columns if migration hasn't run yet
+        try:
+            await insert_alert(
+                alert_id=alert_id,
+                corridor=corridor,
+                cpi=cpi,
+                surge_type=surge_type,
+                ml_confidence=ml_conf,
+            )
+        except Exception as _e2:
+            print(f"[DB ERROR] Could not save alert: {_e2}")
+
+    # STEP 3 — Store in injection map for ongoing simulator broadcasts
+    manual_alert_injections[corridor] = {
+        "alert_id": alert_id,
+        "cpi": cpi,
+        "surge_type": surge_type,
+        "flow_rate": flow_rate,
+        "transport_burst": transport,
+        "chokepoint_density": chokepoint,
+        "time_to_breach_minutes": ttb_min,
+        "time_to_breach_seconds": ttb_min * 60,
+        "ml_confidence": ml_conf,
+        "broadcast_count": 0,
+    }
+
+    # STEP 4 — Broadcast alert to ALL dashboards NOW
+    # This shows the modal on every agency screen
+    alert_broadcast = {
+        "type": "cpi_update",
         "corridor": corridor,
         "cpi": cpi,
-        "surge_type": data.get("surge_type", "GENUINE_CRUSH"),
-        "flow_rate": float(data.get("flow_rate", 1400)),
-        "transport_burst": float(data.get("transport_burst", 0.75)),
-        "chokepoint_density": float(data.get("chokepoint_density", 0.80)),
-        "time_to_breach_minutes": ttb_minutes,
-        "time_to_breach_seconds": ttb_minutes * 60,
-        "ml_confidence": int(data.get("ml_confidence", 89)),
-        "alert_id": f"{prefix}_{ts}_{corridor[:3].upper()}",
-        "data_source": source,
+        "flow_rate": flow_rate,
+        "transport_burst": transport,
+        "chokepoint_density": chokepoint,
+        "surge_type": surge_type,
+        "corridor_state": "SURGE",
+        "state_progress_pct": 50.0,
+        "state_duration_remaining": 3600,
+        "time_to_breach_seconds": ttb_min * 60,
+        "time_to_breach_minutes": ttb_min,
         "alert_active": True,
+        "alert_id": alert_id,
+        "ml_confidence": ml_conf,
+        "ml_risk_level": "CRITICAL",
+        "alert_lifecycle_state": "ACTIVE",
+        "alert_acknowledged_by": [],
+        "alert_duration_minutes": 0,
+        "alert_low_cpi_count": 0,
+        "data_source": source,
+        "vision_active": source == "vision",
+        "vision_count": None,
+        "baseline_flow": flow_rate,
         "timestamp": datetime.utcnow().isoformat() + "Z"
     }
 
-    # Trigger full alert pipeline
-    # handle_new_alert now immediately broadcasts alert_active=True
-    # via cpi_update so agency dashboards open the modal instantly
-    await handle_new_alert(alert_data)
+    # Broadcast immediately
+    await manager.broadcast(alert_broadcast)
+    print(
+        f"[ALERT BROADCAST] Sent to "
+        f"{len(manager.active_connections)} clients"
+    )
+
+    # Broadcast again after 1 second
+    # catches any clients that missed first broadcast
+    async def rebroadcast():
+        await asyncio.sleep(1)
+        await manager.broadcast(alert_broadcast)
+        await asyncio.sleep(2)
+        await manager.broadcast(alert_broadcast)
+
+    asyncio.create_task(rebroadcast())
+
+    # STEP 5 — Start 90-second ack timer
+    asyncio.create_task(
+        _ack_timer_and_call(
+            alert_id=alert_id,
+            corridor=corridor,
+            cpi=cpi,
+            ttb_minutes=ttb_min,
+            surge_type=surge_type,
+            flow_rate=flow_rate,
+            transport_burst=transport,
+            chokepoint_density=chokepoint,
+            ml_confidence=ml_conf,
+        )
+    )
+
+    # STEP 6 — Generate PDF + make calls in background
+    asyncio.create_task(
+        trigger_calls_and_log(
+            corridor=corridor,
+            cpi=cpi,
+            ttb_minutes=ttb_min,
+            surge_type=surge_type,
+            alert_id=alert_id,
+            flow_rate=flow_rate,
+            transport_burst=transport,
+            chokepoint_density=chokepoint,
+            ml_confidence=ml_conf
+        )
+    )
 
     return {
         "status": "triggered",
-        "alert_id": alert_data["alert_id"],
+        "alert_id": alert_id,
         "corridor": corridor,
         "cpi": cpi,
         "source": source,
+        "clients_notified": len(manager.active_connections),
         "message": (
             f"Alert triggered for {corridor}. "
-            f"Agency dashboards notified immediately. "
+            f"Notified {len(manager.active_connections)}"
+            f" connected clients. "
             f"PDF generating and calls being made."
         )
     }
@@ -1162,7 +1270,47 @@ async def get_report_pdf(alert_id: str):
     """Download PDF report for an alert."""
     pdf_path = f"reports/alert_{alert_id}.pdf"
     if not os.path.exists(pdf_path):
-        return {"error": "Report not found", "alert_id": alert_id}
+        # Fall back to JSON report if PDF not yet generated
+        alert = await get_alert_by_id(alert_id)
+        if not alert:
+            raise HTTPException(404, f"Alert {alert_id} not found")
+
+        fired_dt = datetime.fromisoformat(alert["fired_at"])
+        ack_times = {
+            "police": alert.get("police_ack"),
+            "temple": alert.get("temple_ack"),
+            "gsrtc":  alert.get("gsrtc_ack"),
+        }
+        all_acked = all(v for v in ack_times.values())
+        any_acked = any(v for v in ack_times.values())
+        resolved_at = None
+        duration_seconds = None
+
+        if all_acked:
+            resolved_dt = max(datetime.fromisoformat(t) for t in ack_times.values())
+            resolved_at = resolved_dt.isoformat()
+            duration_seconds = int((resolved_dt - fired_dt).total_seconds())
+            outcome = "FULLY_RESOLVED"
+        elif any_acked:
+            outcome = "PARTIAL_ACK"
+        else:
+            outcome = "UNACKNOWLEDGED"
+
+        return {
+            "alert_id":         alert_id,
+            "corridor":         alert["corridor"],
+            "peak_cpi":         alert["cpi"],
+            "surge_type":       alert["surge_type"],
+            "fired_at":         alert["fired_at"],
+            "police_ack_time":  ack_times["police"],
+            "temple_ack_time":  ack_times["temple"],
+            "gsrtc_ack_time":   ack_times["gsrtc"],
+            "ml_confidence":    alert.get("ml_confidence"),
+            "duration_seconds": duration_seconds,
+            "resolved_at":      resolved_at,
+            "outcome":          outcome,
+        }
+
     return FileResponse(
         path=pdf_path,
         media_type="application/pdf",
@@ -1187,48 +1335,6 @@ async def list_reports():
         for f in sorted(files, key=lambda x: x.stat().st_ctime, reverse=True)
     ]
 
-@app.get("/api/report/{alert_id}")
-async def get_report(alert_id: str):
-    alert = await get_alert_by_id(alert_id)
-    if not alert:
-        raise HTTPException(404, f"Alert {alert_id} not found")
-
-    fired_dt = datetime.fromisoformat(alert["fired_at"])
-    ack_times = {
-        "police": alert.get("police_ack"),
-        "temple": alert.get("temple_ack"),
-        "gsrtc":  alert.get("gsrtc_ack"),
-    }
-    all_acked = all(v for v in ack_times.values())
-    any_acked = any(v for v in ack_times.values())
-    resolved_at = None
-    duration_seconds = None
-
-    if all_acked:
-        resolved_dt = max(datetime.fromisoformat(t) for t in ack_times.values())
-        resolved_at = resolved_dt.isoformat()
-        duration_seconds = int((resolved_dt - fired_dt).total_seconds())
-        outcome = "FULLY_RESOLVED"
-    elif any_acked:
-        outcome = "PARTIAL_ACK"
-    else:
-        outcome = "UNACKNOWLEDGED"
-
-    return {
-        "alert_id":         alert_id,
-        "corridor":         alert["corridor"],
-        "peak_cpi":         alert["cpi"],
-        "surge_type":       alert["surge_type"],
-        "fired_at":         alert["fired_at"],
-        "police_ack_time":  ack_times["police"],
-        "temple_ack_time":  ack_times["temple"],
-        "gsrtc_ack_time":   ack_times["gsrtc"],
-        "ml_confidence":    alert.get("ml_confidence"),
-        "duration_seconds": duration_seconds,
-        "resolved_at":      resolved_at,
-        "outcome":          outcome,
-    }
-
 
 # ── Notifications ─────────────────────────────────────────────────────────────
 class NotifyBody(BaseModel):
@@ -1241,19 +1347,19 @@ class NotifyBody(BaseModel):
 
 ROLE_MESSAGES = {
     "driver": lambda b: (
-        f"⚠ ALERT: {b.corridor} corridor CPI {b.cpi:.2f}. "
+        f"ALERT: {b.corridor} corridor CPI {b.cpi:.2f}. "
         f"Hold at checkpoint — do NOT proceed to temple."
     ),
     "police": lambda b: (
-        f"🚨 URGENT: Crush risk at {b.corridor}. "
+        f"URGENT: Crush risk at {b.corridor}. "
         f"Deploy to Choke Point B immediately. Alert ID: {b.alert_id}"
     ),
     "temple": lambda b: (
-        f"🛕 ACTION: Activate darshan hold NOW. "
+        f"ACTION: Activate darshan hold NOW. "
         f"CPI: {b.cpi:.2f} — {b.surge_type}. Redirect pilgrims to Queue C."
     ),
     "gsrtc": lambda b: (
-        f"🚌 HOLD BUSES: {b.corridor} at capacity. "
+        f"HOLD BUSES: {b.corridor} at capacity. "
         f"Hold all vehicles at 3km checkpoint."
     ),
 }

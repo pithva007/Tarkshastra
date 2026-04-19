@@ -103,11 +103,19 @@ async def init_db():
             )
         """)
 
-        # Migration: add ml_confidence column if it doesn't exist yet
-        try:
-            await db.execute("ALTER TABLE alerts ADD COLUMN ml_confidence REAL DEFAULT NULL")
-        except Exception:
-            pass
+        # Migrations — safe to run on every startup; fail silently if column already exists
+        MIGRATIONS = [
+            "ALTER TABLE alerts ADD COLUMN ml_confidence REAL DEFAULT NULL",
+            "ALTER TABLE alerts ADD COLUMN flow_rate REAL DEFAULT NULL",
+            "ALTER TABLE alerts ADD COLUMN transport_burst REAL DEFAULT NULL",
+            "ALTER TABLE alerts ADD COLUMN chokepoint_density REAL DEFAULT NULL",
+            "ALTER TABLE alerts ADD COLUMN state TEXT DEFAULT 'ACTIVE'",
+        ]
+        for sql in MIGRATIONS:
+            try:
+                await db.execute(sql)
+            except Exception:
+                pass  # column already exists
 
         await db.commit()
 

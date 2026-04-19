@@ -141,10 +141,14 @@ def get_session(token: str) -> Optional[dict]:
     return sessions.get(token)
 
 def has_permission(token: str, permission: str) -> bool:
+    # First try the in-memory sessions dict (survives same process)
     session = get_session(token)
     if not session:
+        # Fall back: decode the token directly (works after server restart)
+        session = verify_token(token)
+    if not session:
         return False
-    role = session["role"]
+    role = session.get("role", "")
     return permission in PERMISSIONS.get(role, [])
 
 def get_all_sessions() -> list:
