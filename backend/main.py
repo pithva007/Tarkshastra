@@ -161,6 +161,11 @@ active_corridor_alerts: dict = {}
 alert_resolution_time: dict = {}
 ALERT_COOLDOWN_MINUTES = 15
 
+# Manually triggered alerts that need to be
+# broadcast in next cpi_update cycle
+# Format: {corridor: alert_data_dict}
+manual_alert_injections: dict = {}
+
 # ── Import new simulator ─────────────────────────────────────────────────────
 from simulator import get_simulator
 from bus_simulator import BusSimulator
@@ -241,6 +246,53 @@ async def handle_new_alert(data: dict):
         "ack_deadline_seconds": 90,
         "timestamp": datetime.now(timezone.utc).isoformat(),
     })
+
+    # ── Store for injection into cpi_update broadcast ─────────────────────────
+    manual_alert_injections[corridor] = {
+        "alert_id": alert_id,
+        "cpi": data["cpi"],
+        "surge_type": data["surge_type"],
+        "flow_rate": data.get("flow_rate", 1400),
+        "transport_burst": data.get("transport_burst", 0.75),
+        "chokepoint_density": data.get("chokepoint_density", 0.80),
+        "time_to_breach_minutes": data.get("time_to_breach_minutes", 0),
+        "time_to_breach_seconds": data.get("time_to_breach_seconds", 0),
+        "ml_confidence": data.get("ml_confidence", 89),
+        "broadcast_count": 0,
+    }
+
+    # ── Immediately broadcast alert_fired to ALL clients ──────────────────────
+    # This makes agency dashboards show modal right away
+    await manager.broadcast({
+        "type": "cpi_update",
+        "corridor": corridor,
+        "cpi": data["cpi"],
+        "flow_rate": data.get("flow_rate", 1400),
+        "transport_burst": data.get("transport_burst", 0.75),
+        "chokepoint_density": data.get("chokepoint_density", 0.80),
+        "surge_type": data["surge_type"],
+        "corridor_state": "SURGE",
+        "state_duration_remaining": 3600,
+        "time_to_breach_seconds": data.get("time_to_breach_seconds", 0),
+        "time_to_breach_minutes": data.get("time_to_breach_minutes", 0),
+        "alert_active": True,
+        "alert_id": alert_id,
+        "ml_confidence": data.get("ml_confidence", 89),
+        "ml_risk_level": "CRITICAL",
+        "alert_lifecycle_state": "ACTIVE",
+        "alert_acknowledged_by": [],
+        "alert_duration_minutes": 0,
+        "alert_low_cpi_count": 0,
+        "data_source": data.get("data_source", "simulator"),
+        "vision_active": data.get("data_source") == "vision",
+        "timestamp": datetime.utcnow().isoformat() + "Z",
+    })
+
+    print(
+        f"[ALERT BROADCAST] Sent alert_active=True "
+        f"for {corridor} to all {len(manager.active_connections)}"
+        f" connected clients"
+    )
 
     # ── Start 90-second acknowledgment timer in background ────────────────────
     print(f"[TIMER] Starting 90-second ack timer for {alert_id}")
@@ -340,7 +392,43 @@ async def _ack_timer_and_call(
         ml_confidence=ml_confidence,
     )
 
+
 # ── Lifecycle ─────────────────────────────────────────────────────────────────
+
+# ── Injecting broadcast wrapper ───────────────────────────────────────────────
+async def _broadcast_with_injection(data: dict):
+    """Wrapper around manager.broadcast that injects alert_active=True
+    for any corridor that has a pending manual_alert_injection.
+    Used to piggyback on the simulator's own broadcast loop for 10 cycles."""
+    corridor = data.get("corridor")
+
+    if corridor and data.get("type") == "cpi_update":
+        manual = manual_alert_injections.get(corridor)
+        if manual:
+            # Increment broadcast count
+            manual["broadcast_count"] = manual.get("broadcast_count", 0) + 1
+
+            if manual["broadcast_count"] > 10:
+                # Remove after 10 broadcasts (~20 seconds)
+                del manual_alert_injections[corridor]
+            else:
+                # Override with manual alert data so any agency that
+                # connects after the initial push still sees alert_active=True
+                data = {
+                    **data,
+                    "alert_active": True,
+                    "alert_id": manual["alert_id"],
+                    "surge_type": manual["surge_type"],
+                    "time_to_breach_seconds": manual["time_to_breach_seconds"],
+                    "time_to_breach_minutes": manual["time_to_breach_minutes"],
+                    "ml_confidence": manual["ml_confidence"],
+                    "alert_lifecycle_state": "ACTIVE",
+                    "alert_acknowledged_by": [],
+                }
+
+    await manager.broadcast(data)
+
+
 @app.on_event("startup")
 async def startup():
     print("=== Backend starting ===")
@@ -348,7 +436,9 @@ async def startup():
 
     # Initialize simulator with CSV
     simulator.initialize("TS-PS11.csv")
-    simulator.set_broadcast(manager.broadcast)
+    # Use injection-aware broadcast wrapper so simulator loops also carry
+    # alert_active=True for 10 cycles after a manual trigger
+    simulator.set_broadcast(_broadcast_with_injection)
     simulator.set_alert_callback(handle_new_alert)
     asyncio.create_task(simulator.run())
 
@@ -507,6 +597,8 @@ async def submit_alert_reply(data: dict):
             if corridor_to_resolve in active_corridor_alerts:
                 del active_corridor_alerts[corridor_to_resolve]
                 alert_resolution_time[corridor_to_resolve] = datetime.now(timezone.utc).timestamp()
+                # Also clear any pending manual injection for this corridor
+                manual_alert_injections.pop(corridor_to_resolve, None)
                 
                 await manager.broadcast({
                     "type": "alert_resolved",
@@ -599,6 +691,8 @@ async def resolve_alert(alert_id: str):
     if corridor:
         del active_corridor_alerts[corridor]
         alert_resolution_time[corridor] = datetime.now(timezone.utc).timestamp()
+        # Clear any pending manual injection for this corridor
+        manual_alert_injections.pop(corridor, None)
         print(f"[ALERT RESOLVED] {corridor}: {alert_id}")
         
         await manager.broadcast({
@@ -1044,6 +1138,8 @@ async def simulate_trigger_alert(data: dict):
     }
 
     # Trigger full alert pipeline
+    # handle_new_alert now immediately broadcasts alert_active=True
+    # via cpi_update so agency dashboards open the modal instantly
     await handle_new_alert(alert_data)
 
     return {
@@ -1054,6 +1150,7 @@ async def simulate_trigger_alert(data: dict):
         "source": source,
         "message": (
             f"Alert triggered for {corridor}. "
+            f"Agency dashboards notified immediately. "
             f"PDF generating and calls being made."
         )
     }

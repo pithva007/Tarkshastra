@@ -68,8 +68,8 @@ export default function App() {
   const [pdfViewer, setPdfViewer] = useState(null)
   const [repliesUpdate, setRepliesUpdate] = useState(null)
 
-  const { corridorData, connectionStatus, busData, wsRef } = useWebSocket()
-  const { notifications, unreadCount, markRead, markAllRead, addNotification } = useNotifications(corridorData, activeRole)
+  const { corridorData, connectionStatus, busData } = useWebSocket()
+  const { notifications, unreadCount, markRead, markAllRead } = useNotifications(corridorData, activeRole)
 
   // Handle alert reply requirement
   useEffect(() => {
@@ -154,15 +154,8 @@ export default function App() {
 
       if (data.type === 'vision_complete') {
         console.log('[VISION COMPLETE]', data.result)
-        // Add notification for vision completion
-        addNotification({
-          id: Date.now(),
-          type: 'vision_complete',
-          corridor: data.corridor,
-          message: data.message,
-          read: false,
-          timestamp: new Date().toISOString()
-        })
+        // Vision complete is already logged — useNotifications handles alert_active
+        // notifications automatically from corridorData
       }
 
       if (data.type === 'vision_started') {
@@ -172,7 +165,7 @@ export default function App() {
 
     window.addEventListener('ws_message', handleWSMessage)
     return () => window.removeEventListener('ws_message', handleWSMessage)
-  }, [addNotification])
+  }, [])
 
   // Handle PDF ready notifications
   useEffect(() => {

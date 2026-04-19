@@ -42,6 +42,10 @@ const BG_ACK = { blue: 'bg-blue-950',     yellow: 'bg-yellow-950',     green: 'b
  */
 export default function AgencyPanel({ agency, corridorData, selectedCorridor }) {
   const meta    = AGENCY_META[agency]
+
+  // 'driver' and 'admin' roles don't have agency panels — return nothing
+  if (!meta) return null
+
   const reading = corridorData?.[selectedCorridor] || null
 
   // Normalise surge type — map legacy types to the three canonical ones
