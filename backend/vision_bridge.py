@@ -8,12 +8,14 @@ When a video is processed:
 4. CPI recalculates using real vision data instead
    of simulated data
 5. Real data badge shown on dashboard
+6. If CPI >= 0.85, trigger full alert pipeline
 """
 
 import asyncio
 import time
 import sys
 import os
+from datetime import datetime
 from pathlib import Path
 from typing import Optional, Callable
 
@@ -35,6 +37,9 @@ vision_readings: dict = {}
 # After this time, simulator reverts to synthetic data
 VISION_READING_TTL = 300  # 5 minutes
 
+# CPI threshold that triggers a real alert
+VISION_ALERT_THRESHOLD = 0.85
+
 
 def count_to_flow_rate(
     live_count: int,
@@ -42,7 +47,7 @@ def count_to_flow_rate(
     corridor_width_m: float = None
 ) -> float:
     """Convert head count to flow rate (pax/min).
-    
+
     live_count: people visible in current frame
     corridor: corridor name for calibration
     corridor_width_m: optional override for width
@@ -53,9 +58,9 @@ def count_to_flow_rate(
         multiplier = max(6, corridor_width_m * 3)
     else:
         multiplier = CORRIDOR_CALIBRATION.get(corridor, 12)
-    
+
     flow_rate = live_count * multiplier
-    
+
     # Apply density correction
     # In very dense crowds, each visible person
     # represents more people behind them
@@ -63,7 +68,7 @@ def count_to_flow_rate(
         flow_rate *= 1.4  # Heavy occlusion correction
     elif live_count > 15:
         flow_rate *= 1.2  # Moderate occlusion
-    
+
     return round(flow_rate)
 
 
@@ -91,20 +96,20 @@ def store_vision_reading(
 
 def get_vision_reading(corridor: str) -> Optional[dict]:
     """Get latest valid vision reading for corridor.
-    
+
     Returns None if reading is expired or missing.
     """
     reading = vision_readings.get(corridor)
     if not reading:
         return None
-    
+
     age = time.time() - reading["timestamp"]
     if age > VISION_READING_TTL:
         # Reading expired — remove it
         del vision_readings[corridor]
         print(f"[VISION] {corridor} reading expired")
         return None
-    
+
     reading["age_seconds"] = round(age)
     return reading
 
@@ -128,17 +133,27 @@ def clear_vision_reading(corridor: str):
 
 class VisionProcessor:
     """Processes video files for a specific corridor.
-    
+
     Integrates with crowd_counter module.
     """
-    
+
     def __init__(self):
         self.processing = False
         self.current_corridor = None
         self.progress = 0
         self.result = None
         self._counter = None
-    
+        self._alert_triggered_this_session = False
+        self.alert_callback = None  # Set from main.py on startup
+
+    def reset(self):
+        self.processing = False
+        self.current_corridor = None
+        self.progress = 0
+        self.result = None
+        self._counter = None
+        self._alert_triggered_this_session = False
+
     def _get_counter(self):
         """Lazy load counter to avoid startup delay."""
         if self._counter is None:
@@ -147,9 +162,9 @@ class VisionProcessor:
                 cc_path = Path(__file__).parent.parent / "crowd_counter"
                 if cc_path.exists():
                     sys.path.insert(0, str(cc_path))
-                
+
                 from counter import CrowdCounter
-                
+
                 self._counter = CrowdCounter(
                     model_path="yolov8m.pt",
                     conf_threshold=0.55,
@@ -160,9 +175,9 @@ class VisionProcessor:
             except ImportError as e:
                 print(f"[VISION] CrowdCounter not available: {e}")
                 self._counter = None
-        
+
         return self._counter
-    
+
     async def process_video_async(
         self,
         video_path: str,
@@ -171,14 +186,15 @@ class VisionProcessor:
         progress_callback: Callable = None
     ) -> dict:
         """Process video asynchronously.
-        
+
         Updates vision_readings with results.
         Returns summary dict.
         """
         self.processing = True
         self.current_corridor = corridor
         self.progress = 0
-        
+        self._alert_triggered_this_session = False
+
         try:
             counter = self._get_counter()
             if counter is None:
@@ -186,24 +202,24 @@ class VisionProcessor:
                 return await self._fallback_estimate(
                     video_path, corridor, corridor_width_m
                 )
-            
+
             loop = asyncio.get_event_loop()
             frame_results = []
-            
+
             def frame_callback(frame_result):
                 """Called on each processed frame."""
                 self.progress = round(
-                    frame_result["frame"] / 
+                    frame_result["frame"] /
                     max(counter.total_frames, 1) * 100
                 )
-                
+
                 live_count = frame_result.get("live_count", 0)
                 estimated = frame_result.get("total_unique", live_count)
                 cpi = frame_result.get("cpi", 0)
                 flow_rate = count_to_flow_rate(
                     live_count, corridor, corridor_width_m
                 )
-                
+
                 # Store reading — updates every frame
                 store_vision_reading(
                     corridor=corridor,
@@ -212,14 +228,48 @@ class VisionProcessor:
                     cpi=cpi,
                     flow_rate=flow_rate
                 )
-                
+
                 frame_results.append({
                     "frame": frame_result["frame"],
                     "live_count": live_count,
                     "flow_rate": flow_rate,
                     "cpi": cpi
                 })
-                
+
+                # Check alert threshold — fire once per session
+                if (
+                    cpi >= VISION_ALERT_THRESHOLD
+                    and self.alert_callback is not None
+                    and not self._alert_triggered_this_session
+                ):
+                    self._alert_triggered_this_session = True
+                    print(
+                        f"[VISION ALERT] {corridor} CPI {cpi:.3f}"
+                        f" >= {VISION_ALERT_THRESHOLD} — triggering full alert"
+                    )
+                    alert_data = {
+                        "corridor": corridor,
+                        "cpi": cpi,
+                        "surge_type": "GENUINE_CRUSH",
+                        "flow_rate": flow_rate,
+                        "transport_burst": 0.75,
+                        "chokepoint_density": 0.80,
+                        "time_to_breach_minutes": 0,
+                        "time_to_breach_seconds": 0,
+                        "ml_confidence": 91,
+                        "alert_id": (
+                            f"VIS_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}"
+                            f"_{corridor[:3].upper()}"
+                        ),
+                        "data_source": "vision",
+                        "alert_active": True,
+                        "timestamp": datetime.utcnow().isoformat() + "Z"
+                    }
+                    asyncio.run_coroutine_threadsafe(
+                        self.alert_callback(alert_data),
+                        loop
+                    )
+
                 if progress_callback:
                     asyncio.run_coroutine_threadsafe(
                         progress_callback({
@@ -232,7 +282,7 @@ class VisionProcessor:
                         }),
                         loop
                     )
-            
+
             # Run in thread pool
             summary = await loop.run_in_executor(
                 None,
@@ -243,7 +293,7 @@ class VisionProcessor:
                     callback=frame_callback
                 )
             )
-            
+
             # Final summary
             peak_count = summary.get("peak_live_count", 0)
             avg_count = summary.get("average_live_count", 0)
@@ -253,7 +303,7 @@ class VisionProcessor:
             avg_flow = count_to_flow_rate(
                 int(avg_count), corridor, corridor_width_m
             )
-            
+
             result = {
                 "status": "complete",
                 "corridor": corridor,
@@ -270,12 +320,12 @@ class VisionProcessor:
                     CORRIDOR_CALIBRATION.get(corridor, 12)
                 )
             }
-            
+
             self.result = result
             self.processing = False
             print(f"[VISION] Complete: {result}")
             return result
-            
+
         except Exception as e:
             self.processing = False
             print(f"[VISION ERROR] {e}")
@@ -284,28 +334,28 @@ class VisionProcessor:
                 "error": str(e),
                 "corridor": corridor
             }
-    
+
     async def _fallback_estimate(
         self, video_path, corridor, corridor_width_m
     ) -> dict:
         """Fallback when YOLOv8 not available.
-        
+
         Uses file size and duration to estimate.
         """
         import cv2
-        
+
         cap = cv2.VideoCapture(video_path)
         fps = cap.get(cv2.CAP_PROP_FPS) or 25
         frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
         duration = frame_count / fps
         cap.release()
-        
+
         # Conservative estimate
         estimated_count = 5
         flow_rate = count_to_flow_rate(
             estimated_count, corridor, corridor_width_m
         )
-        
+
         store_vision_reading(
             corridor=corridor,
             live_count=estimated_count,
@@ -313,7 +363,7 @@ class VisionProcessor:
             cpi=flow_rate / 2000 * 0.5,
             flow_rate=flow_rate
         )
-        
+
         self.processing = False
         return {
             "status": "fallback",

@@ -57,6 +57,12 @@ export default function WhatIfSimulator() {
   const [error,    setError]    = useState(null)
   const [prediction, setPrediction] = useState(null)
   const [predictionLoading, setPredictionLoading] = useState(false)
+  const [showResult, setShowResult] = useState(false)
+
+  // Alert trigger states
+  const [triggering, setTriggering] = useState(false)
+  const [triggerResult, setTriggerResult] = useState(null)
+
   const debounceRef = useRef(null)
 
   const runSim = useCallback(() => {
@@ -74,6 +80,8 @@ export default function WhatIfSimulator() {
 
   const runFullPrediction = useCallback(() => {
     setPredictionLoading(true)
+    setShowResult(false)
+    setTriggerResult(null)
     setError(null)
     axios.post(`${API}/api/simulate`, {
       corridor,
@@ -81,11 +89,12 @@ export default function WhatIfSimulator() {
       transport_burst:    transport,
       chokepoint_density: density,
     })
-      .then((r) => { 
+      .then((r) => {
         setPrediction(r.data)
+        setShowResult(true)
         setPredictionLoading(false)
       })
-      .catch((e) => { 
+      .catch((e) => {
         setError('Full prediction failed')
         setPredictionLoading(false)
       })
@@ -104,6 +113,7 @@ export default function WhatIfSimulator() {
     setFlowRate(p.flow_rate)
     setTransport(p.transport_burst)
     setDensity(p.chokepoint_density)
+    setTriggerResult(null)
   }
 
   const ttbLabel = (s) => {
@@ -114,6 +124,43 @@ export default function WhatIfSimulator() {
     return `${m}m ${sec}s`
   }
 
+  async function triggerRealAlert() {
+    if (!prediction) return
+    if (prediction.cpi < 0.75) return
+    setTriggering(true)
+    setTriggerResult(null)
+    const token = localStorage.getItem('ts11_token') || ''
+    try {
+      const res = await fetch(`${API}/api/simulate/trigger-alert`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          token,
+          corridor: prediction.corridor || corridor,
+          cpi: prediction.cpi,
+          flow_rate: prediction.inputs?.flow_rate || flowRate,
+          transport_burst: prediction.inputs?.transport_burst || transport,
+          chokepoint_density: prediction.inputs?.chokepoint_density || density,
+          surge_type: prediction.surge_type,
+          ttb_minutes: prediction.time_to_breach_seconds
+            ? prediction.time_to_breach_seconds / 60
+            : 0,
+          ml_confidence: prediction.ml_confidence || 89,
+          source: 'simulator'
+        })
+      })
+      const data = await res.json()
+      setTriggerResult(data)
+      if (data.status === 'triggered') {
+        console.log('[SIM ALERT] Triggered:', data.alert_id)
+      }
+    } catch (e) {
+      setTriggerResult({ status: 'error', reason: e.message })
+    } finally {
+      setTriggering(false)
+    }
+  }
+
   return (
     <div className="bg-gray-900 rounded-xl border border-gray-700 overflow-hidden">
       {/* Header / toggle */}
@@ -122,7 +169,7 @@ export default function WhatIfSimulator() {
         className="w-full flex items-center justify-between px-4 py-3 hover:bg-gray-800 transition-colors"
       >
         <div className="flex items-center gap-2">
-          <span className="text-amber-400 text-sm font-bold">⚡ What-If Simulator</span>
+          <span className="text-amber-400 text-sm font-bold">What-If Simulator</span>
           <span className="text-gray-500 text-xs">— Pure calculation, no live effect</span>
         </div>
         <span className="text-gray-400 text-xs">{open ? '▲ Collapse' : '▼ Expand'}</span>
@@ -134,7 +181,7 @@ export default function WhatIfSimulator() {
           <div className="flex flex-wrap items-center gap-2">
             <select
               value={corridor}
-              onChange={(e) => setCorridor(e.target.value)}
+              onChange={(e) => { setCorridor(e.target.value); setTriggerResult(null) }}
               className="bg-gray-800 border border-gray-600 text-white text-xs rounded-lg px-3 py-1.5 focus:outline-none"
             >
               {CORRIDORS.map((c) => <option key={c}>{c}</option>)}
@@ -145,7 +192,7 @@ export default function WhatIfSimulator() {
                 onClick={() => applyPreset(key)}
                 className="text-xs px-3 py-1.5 rounded-lg bg-gray-800 border border-gray-600 text-amber-300 hover:bg-gray-700 transition-colors"
               >
-                {key === 'buses' ? '🚌' : '🎪'} {p.label}
+                {p.label}
               </button>
             ))}
           </div>
@@ -205,7 +252,7 @@ export default function WhatIfSimulator() {
             </button>
           </div>
 
-          {/* Result */}
+          {/* Live slider result */}
           <div className="bg-gray-800 rounded-xl p-4 min-h-[80px] flex items-center">
             {loading && (
               <p className="text-gray-400 text-sm animate-pulse">Computing…</p>
@@ -263,15 +310,15 @@ export default function WhatIfSimulator() {
                   <h3 className="text-lg font-semibold text-white">Full Prediction Analysis</h3>
                   <div className="flex items-center gap-2">
                     <span className="text-sm text-gray-400">Risk Level:</span>
-                    <span className="px-3 py-1 rounded-full text-sm font-bold" style={{ 
-                      backgroundColor: `${prediction.risk_color}20`, 
-                      color: prediction.risk_color 
+                    <span className="px-3 py-1 rounded-full text-sm font-bold" style={{
+                      backgroundColor: `${prediction.risk_color}20`,
+                      color: prediction.risk_color
                     }}>
                       {prediction.risk_level}
                     </span>
                   </div>
                 </div>
-                
+
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                   <div>
                     <p className="text-xs text-gray-500 uppercase">CPI</p>
@@ -308,8 +355,8 @@ export default function WhatIfSimulator() {
                     <span className="text-sm text-gray-300">Flow Rate Contribution</span>
                     <div className="flex items-center gap-2">
                       <div className="w-24 bg-gray-700 rounded-full h-2">
-                        <div 
-                          className="h-2 rounded-full bg-blue-500" 
+                        <div
+                          className="h-2 rounded-full bg-blue-500"
                           style={{ width: `${prediction.factor_breakdown?.flow_pct || 0}%` }}
                         />
                       </div>
@@ -322,8 +369,8 @@ export default function WhatIfSimulator() {
                     <span className="text-sm text-gray-300">Transport Burst</span>
                     <div className="flex items-center gap-2">
                       <div className="w-24 bg-gray-700 rounded-full h-2">
-                        <div 
-                          className="h-2 rounded-full bg-amber-500" 
+                        <div
+                          className="h-2 rounded-full bg-amber-500"
                           style={{ width: `${prediction.factor_breakdown?.transport_pct || 0}%` }}
                         />
                       </div>
@@ -336,8 +383,8 @@ export default function WhatIfSimulator() {
                     <span className="text-sm text-gray-300">Chokepoint Density</span>
                     <div className="flex items-center gap-2">
                       <div className="w-24 bg-gray-700 rounded-full h-2">
-                        <div 
-                          className="h-2 rounded-full bg-purple-500" 
+                        <div
+                          className="h-2 rounded-full bg-purple-500"
                           style={{ width: `${prediction.factor_breakdown?.chokepoint_pct || 0}%` }}
                         />
                       </div>
@@ -409,6 +456,116 @@ export default function WhatIfSimulator() {
                     <span className="font-bold">{prediction.post_action_improvement_pct}%</span>
                     {' '}(from {prediction.cpi?.toFixed(3)} to {prediction.post_action_cpi?.toFixed(3)})
                   </p>
+                </div>
+              )}
+
+              {/* Trigger Real Alert — only when CPI >= 0.75 */}
+              {showResult && prediction && prediction.cpi >= 0.75 && (
+                <div style={{
+                  marginTop: '12px',
+                  padding: '14px 16px',
+                  background: '#1e293b',
+                  border: '1px solid #334155',
+                  borderRadius: '10px'
+                }}>
+                  <div style={{
+                    fontSize: '12px',
+                    color: '#94a3b8',
+                    marginBottom: '10px',
+                    lineHeight: '1.5'
+                  }}>
+                    This simulation shows a{' '}
+                    <span style={{ color: prediction.risk_color, fontWeight: '600' }}>
+                      {prediction.risk_level}
+                    </span>
+                    {' '}scenario for {prediction.corridor || corridor}.
+                    Trigger a real alert to notify all agencies and generate an incident report.
+                  </div>
+
+                  {!triggerResult && (
+                    <button
+                      onClick={triggerRealAlert}
+                      disabled={triggering}
+                      style={{
+                        width: '100%',
+                        padding: '10px',
+                        background: triggering ? '#374151' : '#7f1d1d',
+                        border: '1px solid #ef4444',
+                        color: triggering ? '#94a3b8' : '#fca5a5',
+                        borderRadius: '8px',
+                        fontSize: '13px',
+                        fontWeight: '600',
+                        cursor: triggering ? 'not-allowed' : 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '8px'
+                      }}
+                    >
+                      {triggering ? (
+                        <>
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
+                            style={{ animation: 'spin 1s linear infinite' }}>
+                            <circle cx="12" cy="12" r="10" strokeOpacity="0.25"/>
+                            <path d="M12 2a10 10 0 0 1 10 10"/>
+                          </svg>
+                          Triggering alert...
+                        </>
+                      ) : (
+                        <>
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+                            <path d="M12 9v4M12 17h.01"/>
+                          </svg>
+                          Trigger Real Alert for {prediction.corridor || corridor}
+                        </>
+                      )}
+                    </button>
+                  )}
+
+                  {triggerResult && (
+                    <div style={{
+                      padding: '10px 12px',
+                      borderRadius: '8px',
+                      background: triggerResult.status === 'triggered'
+                        ? '#14532d20'
+                        : triggerResult.status === 'skipped'
+                        ? '#1e3a5f20'
+                        : '#7f1d1d20',
+                      border: `1px solid ${
+                        triggerResult.status === 'triggered'
+                          ? '#16a34a'
+                          : triggerResult.status === 'skipped'
+                          ? '#3B82F6'
+                          : '#ef4444'
+                      }40`,
+                      fontSize: '12px'
+                    }}>
+                      <div style={{
+                        fontWeight: '600',
+                        marginBottom: '4px',
+                        color: triggerResult.status === 'triggered'
+                          ? '#86efac'
+                          : triggerResult.status === 'skipped'
+                          ? '#60a5fa'
+                          : '#fca5a5'
+                      }}>
+                        {triggerResult.status === 'triggered'
+                          ? 'Alert triggered successfully'
+                          : triggerResult.status === 'skipped'
+                          ? 'Alert already active'
+                          : 'Could not trigger alert'}
+                      </div>
+                      <div style={{ color: '#94a3b8' }}>
+                        {triggerResult.message || triggerResult.reason}
+                      </div>
+                      {triggerResult.alert_id && (
+                        <div style={{ fontSize: '11px', color: '#64748b', marginTop: '4px' }}>
+                          Alert ID: {triggerResult.alert_id}
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               )}
             </div>

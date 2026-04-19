@@ -212,17 +212,25 @@ async def handle_new_alert(data: dict):
 async def startup():
     print("=== Backend starting ===")
     await init_db()
-    
+
     # Initialize simulator with CSV
     simulator.initialize("TS-PS11.csv")
     simulator.set_broadcast(manager.broadcast)
     simulator.set_alert_callback(handle_new_alert)
     asyncio.create_task(simulator.run())
-    
+
     # Start bus simulator
     asyncio.create_task(run_bus_simulator())
     print("=== Bus Simulator started ===")
-    
+
+    # Connect vision alert callback
+    try:
+        from vision_bridge import vision_processor as _vp
+        _vp.alert_callback = handle_new_alert
+        print("[VISION] Alert pipeline connected")
+    except Exception as _ve:
+        print(f"[VISION] Alert callback not connected: {_ve}")
+
     print("=== Simulator started ===")
     if _ML_AVAILABLE:
         try:
@@ -372,19 +380,36 @@ async def submit_alert_reply(data: dict):
                     "resolved_at": datetime.utcnow().isoformat()
                 })
     
-    # Broadcast reply to all dashboards
+    # Get ALL replies for this alert from DB
+    async with aiosqlite.connect("stampede.db") as db:
+        cursor = await db.execute("""
+            SELECT role, responder_name, unit_id,
+                   action_taken, status, notes,
+                   replied_at, ack_time_seconds
+            FROM alert_replies
+            WHERE alert_id = ?
+            ORDER BY replied_at ASC
+        """, (data.get("alert_id"),))
+        rows = await cursor.fetchall()
+        all_replies = [dict(zip([c[0] for c in cursor.description], row)) for row in rows]
+
+    agencies_replied = [r["role"] for r in all_replies]
+    agencies_pending = [r for r in ["police", "temple", "gsrtc"]
+                        if r not in agencies_replied]
+
+    # Broadcast to ALL connected dashboards
     await manager.broadcast({
-        "type": "alert_reply",
+        "type": "replies_update",
         "alert_id": data.get("alert_id"),
         "corridor": data.get("corridor"),
-        "role": session["role"],
-        "responder": user_session["name"] if user_session else "Unknown",
-        "unit_id": session["unit_id"],
-        "action_taken": data.get("action_taken"),
-        "status": data.get("status"),
-        "replied_at": replied_at
+        "all_replies": all_replies,
+        "agencies_replied": agencies_replied,
+        "agencies_pending": agencies_pending,
+        "latest_role": session["role"],
+        "latest_name": user_session["name"] if user_session else "Unknown",
+        "timestamp": datetime.utcnow().isoformat()
     })
-    
+
     return {
         "status": "reply_saved",
         "alert_id": data.get("alert_id"),
@@ -395,6 +420,31 @@ async def submit_alert_reply(data: dict):
 async def get_replies_for_alert(alert_id: str):
     async with aiosqlite.connect("stampede.db") as db:
         return await get_alert_replies(db, alert_id)
+
+
+@app.get("/api/alert/{alert_id}/all-replies")
+async def get_all_replies_for_alert(alert_id: str):
+    async with aiosqlite.connect("stampede.db") as db:
+        cursor = await db.execute("""
+            SELECT role, responder_name, unit_id,
+                   action_taken, status, notes,
+                   replied_at, ack_time_seconds
+            FROM alert_replies
+            WHERE alert_id = ?
+            ORDER BY replied_at ASC
+        """, (alert_id,))
+        rows = await cursor.fetchall()
+        all_replies = [dict(zip([c[0] for c in cursor.description], row)) for row in rows]
+    agencies_replied = [r["role"] for r in all_replies]
+    agencies_pending = [r for r in ["police", "temple", "gsrtc"]
+                        if r not in agencies_replied]
+    return {
+        "alert_id": alert_id,
+        "all_replies": all_replies,
+        "agencies_replied": agencies_replied,
+        "agencies_pending": agencies_pending,
+        "total": len(all_replies)
+    }
 
 
 @app.post("/api/alert/resolve/{alert_id}")
@@ -772,6 +822,102 @@ async def simulate_scenario(data: dict):
         "safe_suggestions": safe_suggestions,
         "post_action_cpi": post_cpi,
         "post_action_improvement_pct": round((cpi - post_cpi) / cpi * 100) if cpi > 0 else 0
+    }
+
+
+# ── Simulate Trigger Alert ───────────────────────────────────────────────────
+
+@app.post("/api/simulate/trigger-alert")
+async def simulate_trigger_alert(data: dict):
+    """Trigger a REAL alert from What-If simulator or Vision Input.
+
+    Called when user clicks 'Trigger Alert' button after seeing
+    high CPI in simulation or vision analysis.
+
+    Body: {token, corridor, cpi, flow_rate, transport_burst,
+           chokepoint_density, surge_type, ttb_minutes,
+           ml_confidence, source}
+    """
+    from auth import verify_token as _verify
+
+    token = data.get("token", "")
+    session = _verify(token)
+    if not session:
+        raise HTTPException(status_code=401, detail="Authentication required")
+
+    corridor = data.get("corridor", "Ambaji")
+    cpi = float(data.get("cpi", 0.85))
+
+    # Must be above threshold to trigger
+    if cpi < 0.75:
+        return {
+            "status": "rejected",
+            "reason": (
+                f"CPI {cpi:.3f} below threshold 0.75. "
+                f"Only trigger alerts for high CPI scenarios."
+            )
+        }
+
+    # Check lifecycle — don't fire if already active
+    existing_alert_id = active_corridor_alerts.get(corridor)
+    if existing_alert_id:
+        return {
+            "status": "skipped",
+            "reason": (
+                f"{corridor} already has an active alert. "
+                f"Wait for it to resolve before triggering another."
+            ),
+            "existing_alert_id": existing_alert_id
+        }
+
+    # Check cooldown
+    last_alert_time = alert_resolution_time.get(corridor, 0)
+    minutes_since = (datetime.now(timezone.utc).timestamp() - last_alert_time) / 60
+    if minutes_since < ALERT_COOLDOWN_MINUTES:
+        remaining = round(ALERT_COOLDOWN_MINUTES - minutes_since, 1)
+        return {
+            "status": "skipped",
+            "reason": (
+                f"{corridor} is on cooldown — "
+                f"{remaining} minutes remaining before next alert."
+            )
+        }
+
+    # Build alert data
+    ts = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+    source = "vision" if data.get("source") == "vision" else "simulator"
+    prefix = "VIS" if source == "vision" else "SIM"
+    ttb_minutes = float(data.get("ttb_minutes", 0))
+
+    alert_data = {
+        "corridor": corridor,
+        "cpi": cpi,
+        "surge_type": data.get("surge_type", "GENUINE_CRUSH"),
+        "flow_rate": float(data.get("flow_rate", 1400)),
+        "transport_burst": float(data.get("transport_burst", 0.75)),
+        "chokepoint_density": float(data.get("chokepoint_density", 0.80)),
+        "time_to_breach_minutes": ttb_minutes,
+        "time_to_breach_seconds": ttb_minutes * 60,
+        "ml_confidence": int(data.get("ml_confidence", 89)),
+        "alert_id": f"{prefix}_{ts}_{corridor[:3].upper()}",
+        "data_source": source,
+        "alert_active": True,
+        "timestamp": datetime.utcnow().isoformat() + "Z"
+    }
+
+    # Trigger full alert pipeline
+    await handle_new_alert(alert_data)
+
+    return {
+        "status": "triggered",
+        "alert_id": alert_data["alert_id"],
+        "corridor": corridor,
+        "cpi": cpi,
+        "source": source,
+        "message": (
+            f"Alert triggered for {corridor}. "
+            f"PDF generating and calls being made."
+        )
     }
 
 

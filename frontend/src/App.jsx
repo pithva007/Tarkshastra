@@ -18,6 +18,7 @@ import AlertReplyModal from './components/AlertReplyModal'
 import AdminPanel from './components/AdminPanel'
 import PDFViewer from './components/PDFViewer'
 import VisionUpload from './components/VisionUpload'
+import CollaborativeReplies from './components/CollaborativeReplies'
 
 const ROLE_COLORS = {
   police: '#3B82F6',
@@ -65,6 +66,7 @@ export default function App() {
   const [selectedCorridor, setSelectedCorridor] = useState('Ambaji')
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [pdfViewer, setPdfViewer] = useState(null)
+  const [repliesUpdate, setRepliesUpdate] = useState(null)
 
   const { corridorData, connectionStatus, busData, wsRef } = useWebSocket()
   const { notifications, unreadCount, markRead, markAllRead, addNotification } = useNotifications(corridorData, activeRole)
@@ -120,6 +122,10 @@ export default function App() {
         })
         setShowAlertModal(false)
         console.log('[RESOLVED]', data.corridor, data.alert_id)
+      }
+
+      if (data.type === 'replies_update') {
+        setRepliesUpdate(data)
       }
 
       if (data.type === 'pdf_ready') {
@@ -197,10 +203,6 @@ export default function App() {
     }
     setShowAlertModal(false)
     setActiveAlert(null)
-    // Show PDF viewer after reply
-    if (activeAlert?.alert_id) {
-      setPdfViewer(activeAlert.alert_id)
-    }
   }
 
   const handleLogout = () => {
@@ -549,6 +551,14 @@ export default function App() {
               agency={activeRole}
               corridorData={corridorData}
               selectedCorridor={selectedCorridor}
+            />
+
+            {/* Collaborative Replies */}
+            <CollaborativeReplies
+              activeAlertId={activeAlert?.alert_id || null}
+              corridor={activeAlert?.corridor || selectedCorridor}
+              currentRole={activeRole}
+              repliesUpdate={repliesUpdate}
             />
 
             {/* Vision Upload */}

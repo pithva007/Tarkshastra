@@ -11,7 +11,7 @@ const CORRIDOR_WIDTH = {
   Pavagadh: 2.5
 }
 
-export default function VisionUpload({ 
+export default function VisionUpload({
   onVisionData,      // callback when vision data ready
   connectionStatus   // from useWebSocket
 }) {
@@ -26,36 +26,38 @@ export default function VisionUpload({
   const [result, setResult] = useState(null)
   const [error, setError] = useState('')
   const [status, setStatus] = useState('')
-  
+
+  // Vision CPI for alert trigger
+  const [visionCpi, setVisionCpi] = useState(null)
+  const [visionFlowRate, setVisionFlowRate] = useState(null)
+  const [triggering, setTriggering] = useState(false)
+  const [triggerResult, setTriggerResult] = useState(null)
+
   const fileInputRef = useRef(null)
-  
-  // Listen for vision WebSocket messages
-  // These come via the parent's WebSocket connection
-  // Parent passes vision_* type messages via onVisionData
+
+  // Poll vision status while processing
   useEffect(() => {
-    // Poll vision status while processing
     let interval = null
     if (processing) {
       interval = setInterval(async () => {
         try {
           const res = await fetch(`${API}/api/vision/status`)
           const data = await res.json()
-          
+
           if (!data.processing && processing) {
             setProcessing(false)
             setProgress(100)
-            
+
             const reading = data.active_readings[corridor]
             if (reading) {
               setFlowRate(reading.flow_rate)
               setLiveCount(reading.live_count)
+              setVisionCpi(reading.cpi_from_vision || 0)
+              setVisionFlowRate(reading.flow_rate)
               setStatus('Vision data active — CPI updating')
-              
+
               if (onVisionData) {
-                onVisionData({
-                  corridor,
-                  ...reading
-                })
+                onVisionData({ corridor, ...reading })
               }
             }
             clearInterval(interval)
@@ -67,23 +69,26 @@ export default function VisionUpload({
         }
       }, 2000)
     }
-    
+
     return () => clearInterval(interval)
   }, [processing, corridor])
-  
+
   async function handleUpload() {
     if (!file) return
-    
+
     setError('')
     setUploading(true)
     setResult(null)
     setLiveCount(null)
     setFlowRate(null)
-    
+    setVisionCpi(null)
+    setVisionFlowRate(null)
+    setTriggerResult(null)
+
     try {
       const formData = new FormData()
       formData.append('file', file)
-      
+
       const width = CORRIDOR_WIDTH[corridor]
       const res = await fetch(
         `${API}/api/vision/upload` +
@@ -91,9 +96,9 @@ export default function VisionUpload({
         `&corridor_width_m=${width}`,
         { method: 'POST', body: formData }
       )
-      
+
       const data = await res.json()
-      
+
       if (data.status === 'processing_started') {
         setUploading(false)
         setProcessing(true)
@@ -111,15 +116,17 @@ export default function VisionUpload({
       setUploading(false)
     }
   }
-  
+
   async function handleClear() {
     try {
-      await fetch(`${API}/api/vision/clear/${corridor}`, 
-        { method: 'DELETE' })
-      
+      await fetch(`${API}/api/vision/clear/${corridor}`, { method: 'DELETE' })
+
       setResult(null)
       setLiveCount(null)
       setFlowRate(null)
+      setVisionCpi(null)
+      setVisionFlowRate(null)
+      setTriggerResult(null)
       setProgress(0)
       setFile(null)
       setStatus('Cleared — reverted to simulation')
@@ -127,9 +134,39 @@ export default function VisionUpload({
       setError('Clear failed')
     }
   }
-  
+
+  async function triggerVisionAlert() {
+    setTriggering(true)
+    setTriggerResult(null)
+    const storedToken = localStorage.getItem('ts11_token') || ''
+    try {
+      const res = await fetch(`${API}/api/simulate/trigger-alert`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          token: storedToken,
+          corridor: corridor,
+          cpi: visionCpi,
+          flow_rate: visionFlowRate,
+          transport_burst: 0.75,
+          chokepoint_density: 0.80,
+          surge_type: 'GENUINE_CRUSH',
+          ttb_minutes: 0,
+          ml_confidence: 91,
+          source: 'vision'
+        })
+      })
+      const data = await res.json()
+      setTriggerResult(data)
+    } catch (e) {
+      setTriggerResult({ status: 'error', reason: 'Connection failed' })
+    } finally {
+      setTriggering(false)
+    }
+  }
+
   const isActive = flowRate !== null
-  
+
   return (
     <div style={{
       background: '#1e293b',
@@ -150,33 +187,22 @@ export default function VisionUpload({
           userSelect: 'none'
         }}
       >
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '10px'
-        }}>
-          <svg width="18" height="18" viewBox="0 0 24 24" 
-               fill="none" 
-               stroke={isActive ? '#22c55e' : '#94a3b8'} 
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <svg width="18" height="18" viewBox="0 0 24 24"
+               fill="none"
+               stroke={isActive ? '#22c55e' : '#94a3b8'}
                strokeWidth="1.5">
             <path d="M15 10l4.553-2.069A1 1 0 0 1 21 8.867v6.266a1 1 0 0 1-1.447.902L15 14M3 8a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8z"/>
           </svg>
-          
-          <span style={{
-            fontSize: '14px',
-            fontWeight: '600',
-            color: '#f1f5f9'
-          }}>
+
+          <span style={{ fontSize: '14px', fontWeight: '600', color: '#f1f5f9' }}>
             Vision Input
           </span>
-          
-          <span style={{
-            fontSize: '12px',
-            color: '#64748b'
-          }}>
+
+          <span style={{ fontSize: '12px', color: '#64748b' }}>
             — Upload corridor video for real crowd count
           </span>
-          
+
           {isActive && (
             <span style={{
               background: '#14532d',
@@ -190,18 +216,15 @@ export default function VisionUpload({
             </span>
           )}
         </div>
-        
-        <svg width="16" height="16" viewBox="0 0 24 24" 
+
+        <svg width="16" height="16" viewBox="0 0 24 24"
              fill="none" stroke="#64748b" strokeWidth="2">
           <path d={expanded ? "M18 15l-6-6-6 6" : "M6 9l6 6 6-6"}/>
         </svg>
       </div>
-      
+
       {expanded && (
-        <div style={{
-          padding: '0 18px 18px',
-          borderTop: '1px solid #334155'
-        }}>
+        <div style={{ padding: '0 18px 18px', borderTop: '1px solid #334155' }}>
           {/* Active vision badge */}
           {isActive && (
             <div style={{
@@ -216,25 +239,18 @@ export default function VisionUpload({
               alignItems: 'center'
             }}>
               <div>
-                <div style={{
-                  fontSize: '12px',
-                  color: '#86efac',
-                  fontWeight: '600',
-                  marginBottom: '2px'
-                }}>
+                <div style={{ fontSize: '12px', color: '#86efac', fontWeight: '600', marginBottom: '2px' }}>
                   Vision data active for {corridor}
                 </div>
-                <div style={{
-                  fontSize: '12px',
-                  color: '#4ade80',
-                  display: 'flex',
-                  gap: '16px'
-                }}>
+                <div style={{ fontSize: '12px', color: '#4ade80', display: 'flex', gap: '16px' }}>
                   <span>Live count: {liveCount} people</span>
                   <span>Flow rate: {flowRate} pax/min</span>
+                  {visionCpi != null && (
+                    <span>CPI: {visionCpi.toFixed(3)}</span>
+                  )}
                 </div>
               </div>
-              
+
               <button
                 onClick={handleClear}
                 style={{
@@ -251,7 +267,80 @@ export default function VisionUpload({
               </button>
             </div>
           )}
-          
+
+          {/* Alert trigger block — only when vision CPI >= 0.75 */}
+          {isActive && visionCpi != null && visionCpi >= 0.75 && (
+            <div style={{
+              background: '#7f1d1d20',
+              border: '1px solid #ef444450',
+              borderRadius: '8px',
+              padding: '12px 14px',
+              marginBottom: '12px'
+            }}>
+              <div style={{
+                fontSize: '12px',
+                color: '#fca5a5',
+                marginBottom: '8px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px'
+              }}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#ef4444" strokeWidth="2">
+                  <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+                  <path d="M12 9v4M12 17h.01"/>
+                </svg>
+                Vision detected high crowd density at {corridor} — CPI {visionCpi.toFixed(3)}
+              </div>
+
+              {!triggerResult && (
+                <button
+                  onClick={triggerVisionAlert}
+                  disabled={triggering}
+                  style={{
+                    width: '100%',
+                    padding: '8px',
+                    background: '#7f1d1d',
+                    border: '1px solid #ef4444',
+                    color: '#fca5a5',
+                    borderRadius: '6px',
+                    fontSize: '12px',
+                    fontWeight: '600',
+                    cursor: triggering ? 'not-allowed' : 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '6px',
+                    opacity: triggering ? 0.7 : 1
+                  }}
+                >
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+                    <path d="M12 9v4M12 17h.01"/>
+                  </svg>
+                  {triggering ? 'Triggering...' : 'Trigger Full Alert for ' + corridor}
+                </button>
+              )}
+
+              {triggerResult && (
+                <div style={{
+                  fontSize: '12px',
+                  color: triggerResult.status === 'triggered' ? '#86efac' : '#fca5a5',
+                  padding: '6px',
+                  textAlign: 'center'
+                }}>
+                  {triggerResult.status === 'triggered'
+                    ? 'Alert triggered — agencies notified'
+                    : triggerResult.reason || 'Could not trigger alert'}
+                  {triggerResult.alert_id && (
+                    <div style={{ fontSize: '11px', color: '#64748b', marginTop: '4px' }}>
+                      Alert ID: {triggerResult.alert_id}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Controls */}
           <div style={{
             display: 'grid',
@@ -275,7 +364,7 @@ export default function VisionUpload({
               </label>
               <select
                 value={corridor}
-                onChange={e => setCorridor(e.target.value)}
+                onChange={e => { setCorridor(e.target.value); setTriggerResult(null) }}
                 disabled={processing}
                 style={{
                   width: '100%',
@@ -292,7 +381,7 @@ export default function VisionUpload({
                 ))}
               </select>
             </div>
-            
+
             {/* Width info */}
             <div>
               <label style={{
@@ -315,11 +404,11 @@ export default function VisionUpload({
                 fontSize: '13px'
               }}>
                 {CORRIDOR_WIDTH[corridor]}m — multiplier
-                {' '}×{Math.round(CORRIDOR_WIDTH[corridor] * 3)}
+                {' '}x{Math.round(CORRIDOR_WIDTH[corridor] * 3)}
               </div>
             </div>
           </div>
-          
+
           {/* File upload area */}
           <div
             onClick={() => fileInputRef.current?.click()}
@@ -342,36 +431,34 @@ export default function VisionUpload({
               onChange={e => {
                 setFile(e.target.files[0])
                 setError('')
+                setTriggerResult(null)
               }}
             />
-            
-            <svg width="24" height="24" viewBox="0 0 24 24" 
-                 fill="none" 
-                 stroke={file ? '#3B82F6' : '#64748b'} 
+
+            <svg width="24" height="24" viewBox="0 0 24 24"
+                 fill="none"
+                 stroke={file ? '#3B82F6' : '#64748b'}
                  strokeWidth="1.5"
                  style={{ margin: '0 auto 8px' }}>
               <path d="M15 10l4.553-2.069A1 1 0 0 1 21 8.867v6.266a1 1 0 0 1-1.447.902L15 14M3 8a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8z"/>
             </svg>
-            
+
             <div style={{
               fontSize: '13px',
               color: file ? '#60a5fa' : '#94a3b8',
               marginBottom: '4px'
             }}>
-              {file 
+              {file
                 ? `${file.name} (${(file.size/1024/1024).toFixed(1)}MB)`
                 : 'Click to select corridor video'
               }
             </div>
-            
-            <div style={{
-              fontSize: '11px',
-              color: '#64748b'
-            }}>
+
+            <div style={{ fontSize: '11px', color: '#64748b' }}>
               MP4, AVI, MOV, MKV supported
             </div>
           </div>
-          
+
           {/* Progress bar */}
           {processing && (
             <div style={{ marginBottom: '14px' }}>
@@ -385,7 +472,7 @@ export default function VisionUpload({
                 <span>Processing video...</span>
                 <span>{progress}%</span>
               </div>
-              
+
               <div style={{
                 height: '6px',
                 background: '#334155',
@@ -400,17 +487,13 @@ export default function VisionUpload({
                   transition: 'width 0.3s'
                 }} />
               </div>
-              
-              <div style={{
-                fontSize: '11px',
-                color: '#64748b',
-                marginTop: '4px'
-              }}>
+
+              <div style={{ fontSize: '11px', color: '#64748b', marginTop: '4px' }}>
                 {status}
               </div>
             </div>
           )}
-          
+
           {error && (
             <div style={{
               background: '#7f1d1d',
@@ -423,7 +506,7 @@ export default function VisionUpload({
               {error}
             </div>
           )}
-          
+
           {status && !processing && !error && (
             <div style={{
               background: '#14532d20',
@@ -436,7 +519,7 @@ export default function VisionUpload({
               {status}
             </div>
           )}
-          
+
           {/* Upload button */}
           <button
             onClick={handleUpload}
@@ -444,9 +527,7 @@ export default function VisionUpload({
             style={{
               width: '100%',
               padding: '10px',
-              background: (!file || uploading || processing) 
-                ? '#374151' 
-                : '#2563eb',
+              background: (!file || uploading || processing) ? '#374151' : '#2563eb',
               color: 'white',
               border: 'none',
               borderRadius: '8px',
@@ -461,26 +542,21 @@ export default function VisionUpload({
           >
             {uploading || processing ? (
               <>
-                <svg width="14" height="14" 
-                     viewBox="0 0 24 24" 
-                     fill="none" stroke="white" 
+                <svg width="14" height="14"
+                     viewBox="0 0 24 24"
+                     fill="none" stroke="white"
                      strokeWidth="2"
-                     style={{
-                       animation: 'spin 1s linear infinite'
-                     }}>
+                     style={{ animation: 'spin 1s linear infinite' }}>
                   <circle cx="12" cy="12" r="10" strokeOpacity="0.25"/>
                   <path d="M12 2a10 10 0 0 1 10 10"/>
                 </svg>
-                {uploading 
-                  ? 'Uploading...' 
-                  : `Processing ${progress}%`
-                }
+                {uploading ? 'Uploading...' : `Processing ${progress}%`}
               </>
             ) : (
               <>
-                <svg width="14" height="14" 
-                     viewBox="0 0 24 24" 
-                     fill="none" stroke="white" 
+                <svg width="14" height="14"
+                     viewBox="0 0 24 24"
+                     fill="none" stroke="white"
                      strokeWidth="2">
                   <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
                   <path d="M17 8l-5-5-5 5M12 3v12"/>
@@ -489,7 +565,7 @@ export default function VisionUpload({
               </>
             )}
           </button>
-          
+
           {/* How it works note */}
           <div style={{
             marginTop: '12px',
@@ -502,6 +578,7 @@ export default function VisionUpload({
             Flow rate is calculated and fed directly into
             the CPI engine — replacing simulated data
             with real measurements for that corridor.
+            If CPI crosses 0.75, you can trigger a real alert.
             Vision data expires after 5 minutes.
           </div>
         </div>
