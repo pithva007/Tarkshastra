@@ -12,89 +12,82 @@ const CORRIDOR_WIDTH = {
 }
 
 export default function VisionUpload({
-  onVisionData,      // callback when vision data ready
-  connectionStatus   // from useWebSocket
+  onVisionData,
+  connectionStatus,
+  wsData          // latest WebSocket message from App
 }) {
   const [expanded, setExpanded] = useState(false)
   const [corridor, setCorridor] = useState('Ambaji')
   const [file, setFile] = useState(null)
   const [uploading, setUploading] = useState(false)
   const [processing, setProcessing] = useState(false)
-  const [progress,       setProgress]       = useState(0)
-  const [liveCount,      setLiveCount]      = useState(null)
-  const [flowRate,       setFlowRate]       = useState(null)
-  const [result,         setResult]         = useState(null)
-  const [error,          setError]          = useState('')
-  const [status,         setStatus]         = useState('')
-
-  // Frame-level progress for the detailed bar
-  const [framesProcessed, setFramesProcessed] = useState(0)
-  const [framesTotal,     setFramesTotal]     = useState(0)
-  const [liveCpiLive,     setLiveCpiLive]     = useState(null)  // live while processing
-  const [startTime,       setStartTime]       = useState(null)  // when processing began
-
-  // Vision CPI for alert trigger
+  const [progress, setProgress] = useState(0)
+  const [liveCount, setLiveCount] = useState(null)
+  const [flowRate, setFlowRate] = useState(null)
+  const [result, setResult] = useState(null)
+  const [error, setError] = useState('')
+  const [status, setStatus] = useState('')
   const [visionCpi, setVisionCpi] = useState(null)
   const [visionFlowRate, setVisionFlowRate] = useState(null)
   const [triggering, setTriggering] = useState(false)
   const [triggerResult, setTriggerResult] = useState(null)
+  const [isActive, setIsActive] = useState(false)
+
+  // Frame-level progress
+  const [framesRead, setFramesRead] = useState(0)
+  const [framesLeft, setFramesLeft] = useState(0)
+  const [totalFrames, setTotalFrames] = useState(0)
 
   const fileInputRef = useRef(null)
 
-  // Poll vision status while processing
+  // Listen to WebSocket messages for vision events
   useEffect(() => {
-    let interval = null
-    if (processing) {
-      interval = setInterval(async () => {
-        try {
-          const res  = await fetch(`${API}/api/vision/status`)
-          const data = await res.json()
+    if (!wsData) return
 
-          if (!data.processing && processing) {
-            // Done!
-            setProcessing(false)
-            setProgress(100)
-            setFramesProcessed(data.frames_processed || data.total_frames || 0)
-
-            const reading = data.active_readings[corridor]
-            if (reading) {
-              setFlowRate(reading.flow_rate)
-              setLiveCount(reading.live_count)
-              setVisionCpi(reading.cpi_from_vision || 0)
-              setVisionFlowRate(reading.flow_rate)
-              setLiveCpiLive(null)
-              setStatus('Vision data active — CPI updating')
-              if (onVisionData) onVisionData({ corridor, ...reading })
-            }
-            clearInterval(interval)
-
-          } else if (data.processing) {
-            const pct   = data.progress || 0
-            const done  = data.frames_processed  || 0
-            const total = data.total_frames       || 0
-
-            setProgress(pct)
-            setFramesProcessed(done)
-            setFramesTotal(total)
-
-            // also pick up live readings as they stream in
-            const reading = data.active_readings?.[corridor]
-            if (reading) {
-              setLiveCpiLive(reading.cpi_from_vision || 0)
-              setFlowRate(reading.flow_rate || null)
-              setLiveCount(reading.live_count || null)
-            }
-
-            setStatus(`Analysing — ${pct}% complete`)
-          }
-        } catch (e) {
-          console.error('[VISION STATUS]', e)
-        }
-      }, 1000)  // poll every 1s for snappier updates
+    if (wsData.type === 'vision_started' && wsData.corridor === corridor) {
+      setProcessing(true)
+      setProgress(0)
+      setStatus('Starting YOLOv8 analysis...')
+      setFramesRead(0)
+      setFramesLeft(0)
+      setTotalFrames(0)
     }
 
-    return () => clearInterval(interval)
-  }, [processing, corridor])
+    if (wsData.type === 'vision_progress' && wsData.corridor === corridor) {
+      setProgress(wsData.progress || 0)
+      setLiveCount(wsData.live_count || 0)
+      setFlowRate(wsData.flow_rate || 0)
+      setVisionCpi(wsData.cpi || 0)
+      setFramesRead(wsData.keyframe || 0)
+      setFramesLeft((wsData.total_keyframes || 0) - (wsData.keyframe || 0))
+      setTotalFrames(wsData.total_keyframes || 0)
+      setStatus(wsData.message || 'Processing...')
+    }
+
+    if (wsData.type === 'vision_complete' && wsData.corridor === corridor) {
+      const r = wsData.result || {}
+      setProcessing(false)
+      setProgress(100)
+      setLiveCount(r.median_count || 0)
+      setFlowRate(r.average_flow_rate || 0)
+      setVisionCpi(r.peak_cpi || 0)
+      setVisionFlowRate(r.average_flow_rate || 0)
+      setIsActive(true)
+      setStatus(`Complete — ${r.median_count} people detected`)
+      setResult(r)
+      setUploading(false)
+      if (onVisionData) {
+        onVisionData({ corridor, ...r })
+      }
+    }
+
+    if (wsData.type === 'vision_error' && wsData.corridor === corridor) {
+      setProcessing(false)
+      setError(wsData.message || 'Processing failed')
+      setStatus('')
+      setUploading(false)
+    }
+  }, [wsData, corridor])
 
   async function handleUpload() {
     if (!file) return
@@ -107,10 +100,10 @@ export default function VisionUpload({
     setVisionCpi(null)
     setVisionFlowRate(null)
     setTriggerResult(null)
-    setFramesProcessed(0)
-    setFramesTotal(0)
-    setLiveCpiLive(null)
-    setStartTime(Date.now())
+    setFramesRead(0)
+    setFramesLeft(0)
+    setTotalFrames(0)
+    setIsActive(false)
 
     try {
       const formData = new FormData()
@@ -147,7 +140,6 @@ export default function VisionUpload({
   async function handleClear() {
     try {
       await fetch(`${API}/api/vision/clear/${corridor}`, { method: 'DELETE' })
-
       setResult(null)
       setLiveCount(null)
       setFlowRate(null)
@@ -156,6 +148,7 @@ export default function VisionUpload({
       setTriggerResult(null)
       setProgress(0)
       setFile(null)
+      setIsActive(false)
       setStatus('Cleared — reverted to simulation')
     } catch (e) {
       setError('Clear failed')
@@ -172,7 +165,7 @@ export default function VisionUpload({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           token: storedToken,
-          corridor: corridor,
+          corridor,
           cpi: visionCpi,
           flow_rate: visionFlowRate,
           transport_burst: 0.75,
@@ -191,8 +184,6 @@ export default function VisionUpload({
       setTriggering(false)
     }
   }
-
-  const isActive = flowRate !== null
 
   return (
     <div style={{
@@ -221,15 +212,12 @@ export default function VisionUpload({
                strokeWidth="1.5">
             <path d="M15 10l4.553-2.069A1 1 0 0 1 21 8.867v6.266a1 1 0 0 1-1.447.902L15 14M3 8a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8z"/>
           </svg>
-
           <span style={{ fontSize: '14px', fontWeight: '600', color: '#f1f5f9' }}>
             Vision Input
           </span>
-
           <span style={{ fontSize: '12px', color: '#64748b' }}>
             — Upload corridor video for real crowd count
           </span>
-
           {isActive && (
             <span style={{
               background: '#14532d',
@@ -243,17 +231,16 @@ export default function VisionUpload({
             </span>
           )}
         </div>
-
         <svg width="16" height="16" viewBox="0 0 24 24"
              fill="none" stroke="#64748b" strokeWidth="2">
-          <path d={expanded ? "M18 15l-6-6-6 6" : "M6 9l6 6 6-6"}/>
+          <path d={expanded ? 'M18 15l-6-6-6 6' : 'M6 9l6 6 6-6'}/>
         </svg>
       </div>
 
       {expanded && (
         <div style={{ padding: '0 18px 18px', borderTop: '1px solid #334155' }}>
 
-          {/* Active vision data badge — redesigned */}
+          {/* Active vision data badge */}
           {isActive && (
             <div style={{
               background: '#14532d',
@@ -269,11 +256,7 @@ export default function VisionUpload({
                 alignItems: 'center',
                 marginBottom: '8px'
               }}>
-                <div style={{
-                  fontSize: '12px',
-                  color: '#86efac',
-                  fontWeight: '600'
-                }}>
+                <div style={{ fontSize: '12px', color: '#86efac', fontWeight: '600' }}>
                   Vision data active — {corridor}
                 </div>
                 <button
@@ -299,26 +282,12 @@ export default function VisionUpload({
                 marginBottom: visionCpi >= 0.75 ? '10px' : 0
               }}>
                 {[
-                  {
-                    label: 'People counted',
-                    value: liveCount || 0,
-                    color: '#86efac'
-                  },
-                  {
-                    label: 'Flow rate',
-                    value: `${flowRate || 0}/min`,
-                    color: '#86efac'
-                  },
+                  { label: 'People counted', value: liveCount || 0, color: '#86efac' },
+                  { label: 'Flow rate', value: `${flowRate || 0}/min`, color: '#86efac' },
                   {
                     label: 'Vision CPI',
-                    value: visionCpi
-                      ? visionCpi.toFixed(3)
-                      : '0.000',
-                    color: visionCpi >= 0.85
-                      ? '#ef4444'
-                      : visionCpi >= 0.70
-                      ? '#f59e0b'
-                      : '#86efac'
+                    value: visionCpi ? visionCpi.toFixed(3) : '0.000',
+                    color: visionCpi >= 0.85 ? '#ef4444' : visionCpi >= 0.70 ? '#f59e0b' : '#86efac'
                   }
                 ].map(item => (
                   <div key={item.label} style={{
@@ -327,25 +296,16 @@ export default function VisionUpload({
                     padding: '8px',
                     textAlign: 'center'
                   }}>
-                    <div style={{
-                      fontSize: '16px',
-                      fontWeight: '700',
-                      color: item.color
-                    }}>
+                    <div style={{ fontSize: '16px', fontWeight: '700', color: item.color }}>
                       {item.value}
                     </div>
-                    <div style={{
-                      fontSize: '10px',
-                      color: '#64748b',
-                      marginTop: '2px'
-                    }}>
+                    <div style={{ fontSize: '10px', color: '#64748b', marginTop: '2px' }}>
                       {item.label}
                     </div>
                   </div>
                 ))}
               </div>
 
-              {/* Alert trigger when vision CPI is high */}
               {visionCpi >= 0.75 && (
                 <div style={{
                   background: '#7f1d1d30',
@@ -361,17 +321,13 @@ export default function VisionUpload({
                     alignItems: 'center',
                     gap: '5px'
                   }}>
-                    <svg width="13" height="13"
-                         viewBox="0 0 24 24"
-                         fill="none"
-                         stroke="#ef4444"
-                         strokeWidth="2">
+                    <svg width="13" height="13" viewBox="0 0 24 24"
+                         fill="none" stroke="#ef4444" strokeWidth="2">
                       <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
                       <path d="M12 9v4M12 17h.01"/>
                     </svg>
                     High density detected — CPI {visionCpi?.toFixed(3)}
                   </div>
-
                   {!triggerResult ? (
                     <button
                       onClick={triggerVisionAlert}
@@ -392,31 +348,18 @@ export default function VisionUpload({
                         gap: '6px'
                       }}
                     >
-                      <svg width="12" height="12"
-                           viewBox="0 0 24 24"
-                           fill="none"
-                           stroke="currentColor"
-                           strokeWidth="2">
-                        <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
-                        <path d="M12 9v4M12 17h.01"/>
-                      </svg>
-                      {triggering
-                        ? 'Triggering...'
-                        : `Trigger Alert — ${corridor}`
-                      }
+                      {triggering ? 'Triggering...' : `Trigger Alert — ${corridor}`}
                     </button>
                   ) : (
                     <div style={{
                       fontSize: '12px',
-                      color: triggerResult.status === 'triggered'
-                        ? '#86efac' : '#fca5a5',
+                      color: triggerResult.status === 'triggered' ? '#86efac' : '#fca5a5',
                       textAlign: 'center',
                       padding: '6px'
                     }}>
                       {triggerResult.status === 'triggered'
                         ? 'Alert triggered — all agencies notified'
-                        : triggerResult.reason
-                      }
+                        : triggerResult.reason}
                     </div>
                   )}
                 </div>
@@ -432,7 +375,6 @@ export default function VisionUpload({
             marginTop: '14px',
             marginBottom: '14px'
           }}>
-            {/* Corridor select */}
             <div>
               <label style={{
                 fontSize: '11px',
@@ -464,8 +406,6 @@ export default function VisionUpload({
                 ))}
               </select>
             </div>
-
-            {/* Width info */}
             <div>
               <label style={{
                 fontSize: '11px',
@@ -486,8 +426,7 @@ export default function VisionUpload({
                 color: '#94a3b8',
                 fontSize: '13px'
               }}>
-                {CORRIDOR_WIDTH[corridor]}m — multiplier
-                {' '}x{Math.round(CORRIDOR_WIDTH[corridor] * 3)}
+                {CORRIDOR_WIDTH[corridor]}m — multiplier x{Math.round(CORRIDOR_WIDTH[corridor] * 3)}
               </div>
             </div>
           </div>
@@ -517,7 +456,6 @@ export default function VisionUpload({
                 setTriggerResult(null)
               }}
             />
-
             <svg width="24" height="24" viewBox="0 0 24 24"
                  fill="none"
                  stroke={file ? '#3B82F6' : '#64748b'}
@@ -525,190 +463,125 @@ export default function VisionUpload({
                  style={{ margin: '0 auto 8px' }}>
               <path d="M15 10l4.553-2.069A1 1 0 0 1 21 8.867v6.266a1 1 0 0 1-1.447.902L15 14M3 8a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8z"/>
             </svg>
-
-            <div style={{
-              fontSize: '13px',
-              color: file ? '#60a5fa' : '#94a3b8',
-              marginBottom: '4px'
-            }}>
+            <div style={{ fontSize: '13px', color: file ? '#60a5fa' : '#94a3b8', marginBottom: '4px' }}>
               {file
-                ? `${file.name} (${(file.size/1024/1024).toFixed(1)}MB)`
-                : 'Click to select corridor video'
-              }
+                ? `${file.name} (${(file.size / 1024 / 1024).toFixed(1)}MB)`
+                : 'Click to select corridor video'}
             </div>
-
             <div style={{ fontSize: '11px', color: '#64748b' }}>
               MP4, AVI, MOV, MKV supported
             </div>
           </div>
 
-          {/* ── Rich progress panel ── */}
-          {processing && (() => {
-            const framesLeft = Math.max(framesTotal - framesProcessed, 0)
-            // ETA: based on elapsed time and frames done
-            let etaLabel = ''
-            if (startTime && framesProcessed > 0 && framesLeft > 0) {
-              const elapsedSec = (Date.now() - startTime) / 1000
-              const secPerFrame = elapsedSec / framesProcessed
-              const etaSec = Math.round(secPerFrame * framesLeft)
-              if (etaSec < 60) etaLabel = `~${etaSec}s left`
-              else etaLabel = `~${Math.ceil(etaSec / 60)}min left`
-            }
-            const elapsedLabel = startTime
-              ? `${Math.round((Date.now() - startTime) / 1000)}s elapsed`
-              : ''
-
-            return (
+          {/* Processing progress panel */}
+          {processing && (
+            <div style={{ marginBottom: '14px' }}>
+              {/* Progress header */}
               <div style={{
-                background: '#0f172a',
-                border: '1px solid #334155',
-                borderRadius: '10px',
-                padding: '14px',
-                marginBottom: '14px'
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                marginBottom: '8px'
               }}>
-                {/* Top row: label + pct */}
                 <div style={{
                   display: 'flex',
-                  justifyContent: 'space-between',
                   alignItems: 'center',
-                  marginBottom: '10px'
+                  gap: '8px',
+                  fontSize: '13px',
+                  fontWeight: '600',
+                  color: '#60a5fa'
                 }}>
-                  <div style={{
-                    fontSize: '12px',
-                    fontWeight: '600',
-                    color: '#60a5fa',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '6px'
+                  <svg width="14" height="14" viewBox="0 0 24 24"
+                       fill="none" stroke="currentColor" strokeWidth="2"
+                       style={{ animation: 'spin 1s linear infinite' }}>
+                    <circle cx="12" cy="12" r="10" strokeOpacity="0.25"/>
+                    <path d="M12 2a10 10 0 0 1 10 10"/>
+                  </svg>
+                  YOLOv8 Analysing
+                </div>
+                <span style={{ fontSize: '13px', fontWeight: '700', color: '#60a5fa' }}>
+                  {progress}%
+                </span>
+              </div>
+
+              {/* Progress bar */}
+              <div style={{
+                height: '6px',
+                background: '#1e293b',
+                borderRadius: '3px',
+                overflow: 'hidden',
+                marginBottom: '10px'
+              }}>
+                <div style={{
+                  width: `${progress}%`,
+                  height: '100%',
+                  background: '#3B82F6',
+                  borderRadius: '3px',
+                  transition: 'width 0.5s ease'
+                }} />
+              </div>
+
+              {/* Frame stats */}
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: '1fr 1fr 1fr',
+                gap: '8px',
+                marginBottom: '8px'
+              }}>
+                {[
+                  { label: 'Frames read', value: framesRead, color: '#22c55e' },
+                  { label: 'Frames left', value: framesLeft, color: '#f59e0b' },
+                  { label: 'Total to process', value: totalFrames, color: '#94a3b8' }
+                ].map(s => (
+                  <div key={s.label} style={{
+                    background: '#0f172a',
+                    borderRadius: '6px',
+                    padding: '8px',
+                    textAlign: 'center'
                   }}>
-                    <svg width="12" height="12" viewBox="0 0 24 24"
-                         fill="none" stroke="#60a5fa" strokeWidth="2"
-                         style={{ animation: 'spin 1.4s linear infinite' }}>
-                      <path d="M12 2a10 10 0 0 1 10 10"/>
-                      <circle cx="12" cy="12" r="10" strokeOpacity="0.2"/>
-                    </svg>
-                    YOLOv8 Analysing
+                    <div style={{ fontSize: '18px', fontWeight: '700', color: s.color }}>
+                      {s.value}
+                    </div>
+                    <div style={{ fontSize: '10px', color: '#64748b', marginTop: '2px' }}>
+                      {s.label}
+                    </div>
                   </div>
-                  <span style={{
-                    fontSize: '16px',
-                    fontWeight: '700',
-                    color: progress > 70 ? '#22c55e' : progress > 30 ? '#f59e0b' : '#60a5fa',
-                    fontFamily: 'monospace'
-                  }}>
-                    {progress}%
+                ))}
+              </div>
+
+              {/* Live count while processing */}
+              {liveCount > 0 && (
+                <div style={{
+                  background: '#0f172a',
+                  borderRadius: '6px',
+                  padding: '8px 12px',
+                  fontSize: '12px',
+                  color: '#94a3b8',
+                  display: 'flex',
+                  justifyContent: 'space-between'
+                }}>
+                  <span>
+                    Current frame count:{' '}
+                    <span style={{ color: '#f1f5f9', fontWeight: '600' }}>{liveCount} people</span>
+                  </span>
+                  <span>
+                    Flow:{' '}
+                    <span style={{ color: '#f1f5f9', fontWeight: '600' }}>{flowRate}/min</span>
                   </span>
                 </div>
+              )}
 
-                {/* Segmented progress bar */}
-                <div style={{
-                  height: '8px',
-                  background: '#1e293b',
-                  borderRadius: '4px',
-                  overflow: 'hidden',
-                  marginBottom: '10px',
-                  position: 'relative'
-                }}>
-                  <div style={{
-                    width: `${progress}%`,
-                    height: '100%',
-                    background: 'linear-gradient(90deg, #3b82f6, #60a5fa)',
-                    borderRadius: '4px',
-                    transition: 'width 0.8s ease',
-                    boxShadow: '0 0 8px #3b82f680'
-                  }}/>
-                  {/* Shimmer overlay */}
-                  <div style={{
-                    position: 'absolute',
-                    top: 0, left: 0,
-                    width: '100%', height: '100%',
-                    background: 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.15) 50%, transparent 100%)',
-                    animation: 'shimmer 1.5s infinite',
-                    borderRadius: '4px'
-                  }}/>
-                </div>
-
-                {/* Frame counters row */}
-                <div style={{
-                  display: 'grid',
-                  gridTemplateColumns: '1fr 1fr 1fr',
-                  gap: '8px',
-                  marginBottom: framesTotal > 0 ? '10px' : 0
-                }}>
-                  {[
-                    { label: 'Frames read',      value: framesProcessed.toLocaleString(), color: '#22c55e' },
-                    { label: 'Frames left',       value: framesLeft.toLocaleString(),      color: '#f59e0b' },
-                    { label: 'Total to process',  value: framesTotal > 0 ? framesTotal.toLocaleString() : '—', color: '#94a3b8' }
-                  ].map(item => (
-                    <div key={item.label} style={{
-                      background: '#1e293b',
-                      borderRadius: '6px',
-                      padding: '8px',
-                      textAlign: 'center'
-                    }}>
-                      <div style={{
-                        fontSize: '15px',
-                        fontWeight: '700',
-                        color: item.color,
-                        fontFamily: 'monospace'
-                      }}>{item.value}</div>
-                      <div style={{
-                        fontSize: '10px',
-                        color: '#64748b',
-                        marginTop: '2px'
-                      }}>{item.label}</div>
-                    </div>
-                  ))}
-                </div>
-
-                {/* Live reading while processing + timing */}
-                <div style={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                  flexWrap: 'wrap',
-                  gap: '6px'
-                }}>
-                  <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
-                    {liveCount !== null && (
-                      <span style={{ fontSize: '11px', color: '#60a5fa' }}>
-                        👤 {liveCount} people visible
-                      </span>
-                    )}
-                    {liveCpiLive !== null && (
-                      <span style={{
-                        fontSize: '11px',
-                        color: liveCpiLive >= 0.85 ? '#ef4444'
-                             : liveCpiLive >= 0.70 ? '#f59e0b'
-                             : '#22c55e'
-                      }}>
-                        CPI {liveCpiLive.toFixed(3)}
-                      </span>
-                    )}
-                    {flowRate !== null && (
-                      <span style={{ fontSize: '11px', color: '#94a3b8' }}>
-                        Flow {flowRate}/min
-                      </span>
-                    )}
-                  </div>
-                  <div style={{
-                    fontSize: '11px',
-                    color: '#475569',
-                    display: 'flex',
-                    gap: '8px'
-                  }}>
-                    {elapsedLabel && <span>{elapsedLabel}</span>}
-                    {etaLabel && (
-                      <span style={{ color: '#60a5fa', fontWeight: '600' }}>
-                        {etaLabel}
-                      </span>
-                    )}
-                  </div>
-                </div>
+              {/* Status text */}
+              <div style={{
+                fontSize: '11px',
+                color: '#64748b',
+                marginTop: '6px',
+                textAlign: 'center'
+              }}>
+                {status || 'Processing keyframes...'}
               </div>
-            )
-          })()}
-
-
+            </div>
+          )}
 
           {error && (
             <div style={{
@@ -738,6 +611,7 @@ export default function VisionUpload({
 
           {/* Upload button */}
           <button
+            id="visionProcessBtn"
             onClick={handleUpload}
             disabled={!file || uploading || processing}
             style={{
@@ -758,10 +632,8 @@ export default function VisionUpload({
           >
             {uploading || processing ? (
               <>
-                <svg width="14" height="14"
-                     viewBox="0 0 24 24"
-                     fill="none" stroke="white"
-                     strokeWidth="2"
+                <svg width="14" height="14" viewBox="0 0 24 24"
+                     fill="none" stroke="white" strokeWidth="2"
                      style={{ animation: 'spin 1s linear infinite' }}>
                   <circle cx="12" cy="12" r="10" strokeOpacity="0.25"/>
                   <path d="M12 2a10 10 0 0 1 10 10"/>
@@ -770,10 +642,8 @@ export default function VisionUpload({
               </>
             ) : (
               <>
-                <svg width="14" height="14"
-                     viewBox="0 0 24 24"
-                     fill="none" stroke="white"
-                     strokeWidth="2">
+                <svg width="14" height="14" viewBox="0 0 24 24"
+                     fill="none" stroke="white" strokeWidth="2">
                   <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
                   <path d="M17 8l-5-5-5 5M12 3v12"/>
                 </svg>
@@ -782,7 +652,6 @@ export default function VisionUpload({
             )}
           </button>
 
-          {/* How it works note */}
           <div style={{
             marginTop: '12px',
             fontSize: '11px',

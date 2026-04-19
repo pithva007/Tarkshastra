@@ -67,6 +67,7 @@ export default function App() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [pdfViewer, setPdfViewer] = useState(null)
   const [repliesUpdate, setRepliesUpdate] = useState(null)
+  const [wsData, setWsData] = useState(null)
 
   const { corridorData, connectionStatus, busData } = useWebSocket()
   const { notifications, unreadCount, markRead, markAllRead } = useNotifications(corridorData, activeRole)
@@ -111,6 +112,8 @@ export default function App() {
   useEffect(() => {
     const handleWSMessage = (event) => {
       const data = event.detail
+
+      setWsData(data)  // Always store latest message
 
       if (data.type === 'alert_resolved') {
         // Alert is officially resolved — update UI
@@ -631,6 +634,7 @@ export default function App() {
                 console.log('[VISION DATA]', data)
               }}
               connectionStatus={connectionStatus}
+              wsData={wsData}
             />
 
             {/* What-If Simulator */}

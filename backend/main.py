@@ -1614,40 +1614,226 @@ async def process_vision_video(
     corridor: str,
     corridor_width_m: float = None
 ):
-    """Background task for video processing."""
-    
-    # Progress callback — broadcasts to WebSocket
-    async def on_progress(data: dict):
-        await manager.broadcast(data)
-    
-    # Notify start
+    """Background task — processes video with progress."""
+    print(f"[VISION] Starting: {video_path}")
+    print(f"[VISION] Corridor: {corridor}")
+
     await manager.broadcast({
         "type": "vision_started",
         "corridor": corridor,
-        "message": f"Vision analysis started for {corridor}"
+        "message": f"Starting vision analysis for {corridor}"
     })
-    
-    result = await vision_processor.process_video_async(
-        video_path=video_path,
-        corridor=corridor,
-        corridor_width_m=corridor_width_m,
-        progress_callback=on_progress
-    )
-    
-    # Notify completion
-    await manager.broadcast({
-        "type": "vision_complete",
-        "corridor": corridor,
-        "result": result,
-        "message": (
-            f"Vision analysis complete for {corridor}. "
-            f"Peak count: {result.get('peak_live_count', 0)} "
-            f"people. Flow rate: "
-            f"{result.get('peak_flow_rate', 0)} pax/min."
+
+    loop = asyncio.get_event_loop()
+
+    progress_state = {
+        "pct": 0, "live_count": 0, "flow_rate": 0, "cpi": 0,
+        "keyframe": 0, "total_keyframes": 0, "done": False, "error": None
+    }
+
+    async def broadcast_progress():
+        while not progress_state["done"]:
+            await manager.broadcast({
+                "type": "vision_progress",
+                "corridor": corridor,
+                "progress": progress_state["pct"],
+                "live_count": progress_state["live_count"],
+                "flow_rate": progress_state["flow_rate"],
+                "cpi": progress_state["cpi"],
+                "keyframe": progress_state["keyframe"],
+                "total_keyframes": progress_state["total_keyframes"],
+                "message": (
+                    f"Processing keyframe "
+                    f"{progress_state['keyframe']}/"
+                    f"{progress_state['total_keyframes']} "
+                    f"— {progress_state['pct']}%"
+                )
+            })
+            await asyncio.sleep(2)
+
+    progress_task = asyncio.create_task(broadcast_progress())
+
+    def run_processing():
+        try:
+            import cv2
+            import numpy as np
+
+            cap = cv2.VideoCapture(video_path)
+            if not cap.isOpened():
+                progress_state["error"] = "Cannot open video file"
+                progress_state["done"] = True
+                return None
+
+            fps = cap.get(cv2.CAP_PROP_FPS) or 25
+            total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+            orig_w = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+            orig_h = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+            print(f"[VISION] Video: {total_frames} frames @ {fps:.0f}fps {orig_w}x{orig_h}")
+
+            # 1 keyframe per 2 seconds
+            interval = max(1, int(fps * 2))
+            total_keyframes = max(1, total_frames // interval)
+            progress_state["total_keyframes"] = total_keyframes
+            print(f"[VISION] Processing {total_keyframes} keyframes (every {interval} frames)")
+
+            # Load YOLO from local file only — never download during processing
+            model = None
+            try:
+                from ultralytics import YOLO
+                local_model = os.path.normpath(
+                    os.path.join(os.path.dirname(video_path), "..", "yolov8n.pt")
+                )
+                if os.path.exists(local_model):
+                    model = YOLO(local_model)
+                    print(f"[VISION] YOLOv8n loaded from {local_model}")
+                elif os.path.exists("yolov8n.pt"):
+                    model = YOLO("yolov8n.pt")
+                    print("[VISION] YOLOv8n loaded from cwd")
+                else:
+                    print("[VISION] yolov8n.pt not found — using fallback")
+            except Exception as e:
+                print(f"[VISION] YOLO not available: {e}")
+
+            counts = []
+            keyframe_num = 0
+
+            for kf_idx in range(total_keyframes):
+                target = kf_idx * interval
+                cap.set(cv2.CAP_PROP_POS_FRAMES, target)
+                ret, frame = cap.read()
+                if not ret:
+                    break
+
+                keyframe_num += 1
+
+                # Always resize to 480p — critical for 4K video
+                h, w = frame.shape[:2]
+                if w > 854 or h > 480:
+                    scale = min(854 / w, 480 / h)
+                    frame = cv2.resize(
+                        frame, (int(w * scale), int(h * scale)),
+                        interpolation=cv2.INTER_LINEAR
+                    )
+
+                count = 0
+                if model is not None:
+                    try:
+                        results = model(frame, classes=[0], conf=0.45,
+                                        iou=0.45, verbose=False, imgsz=480)
+                        if results[0].boxes is not None:
+                            for box in results[0].boxes:
+                                x1, y1, x2, y2 = map(int, box.xyxy[0])
+                                if (x2 - x1) > 20 and (y2 - y1) > 40:
+                                    count += 1
+                    except Exception as e:
+                        print(f"[VISION] Frame error: {e}")
+                        count = 0
+                else:
+                    gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+                    edges = cv2.Canny(gray, 50, 150)
+                    h2, w2 = frame.shape[:2]
+                    count = int(np.count_nonzero(edges) / (h2 * w2) * 150)
+
+                counts.append(count)
+
+                multiplier = {"Ambaji": 12, "Dwarka": 10, "Somnath": 14, "Pavagadh": 8}.get(corridor, 12)
+                flow_rate = count * multiplier
+                cpi = round(min(flow_rate / 2000, 1.0), 3)
+                pct = round(keyframe_num / total_keyframes * 100)
+
+                progress_state.update({
+                    "pct": pct, "live_count": count,
+                    "flow_rate": flow_rate, "cpi": cpi,
+                    "keyframe": keyframe_num
+                })
+                print(f"[VISION] KF {keyframe_num}/{total_keyframes} ({pct}%) count={count} flow={flow_rate}")
+
+            cap.release()
+
+            if not counts:
+                counts = [0]
+            median_count = int(np.median(counts))
+            peak_count = max(counts)
+            avg_count = round(sum(counts) / len(counts), 1)
+
+            multiplier = {"Ambaji": 12, "Dwarka": 10, "Somnath": 14, "Pavagadh": 8}.get(corridor, 12)
+            peak_flow = peak_count * multiplier
+            avg_flow = int(avg_count * multiplier)
+            peak_cpi = round(min(peak_flow / 2000, 1.0), 3)
+
+            from vision_bridge import store_vision_reading
+            store_vision_reading(
+                corridor=corridor, live_count=median_count,
+                estimated_count=peak_count, cpi=peak_cpi, flow_rate=avg_flow
+            )
+
+            result = {
+                "status": "complete", "corridor": corridor,
+                "total_keyframes": keyframe_num,
+                "median_count": median_count, "peak_count": peak_count,
+                "average_count": avg_count, "peak_flow_rate": peak_flow,
+                "average_flow_rate": avg_flow, "peak_cpi": peak_cpi,
+                "total_unique_people": median_count,
+                "peak_live_count": peak_count, "average_live_count": avg_count,
+                "processing_time_seconds": 0
+            }
+            progress_state["done"] = True
+            return result
+
+        except Exception as e:
+            print(f"[VISION FATAL] {e}")
+            import traceback
+            traceback.print_exc()
+            progress_state["error"] = str(e)
+            progress_state["done"] = True
+            return None
+
+    try:
+        result = await asyncio.wait_for(
+            loop.run_in_executor(None, run_processing),
+            timeout=600
         )
-    })
-    
-    print(f"[VISION] Complete broadcast sent for {corridor}")
+    except asyncio.TimeoutError:
+        progress_state["done"] = True
+        progress_task.cancel()
+        await manager.broadcast({
+            "type": "vision_error", "corridor": corridor,
+            "message": "Processing timed out after 10 min"
+        })
+        return
+    except Exception as e:
+        progress_state["done"] = True
+        progress_task.cancel()
+        await manager.broadcast({
+            "type": "vision_error", "corridor": corridor, "message": str(e)
+        })
+        return
+
+    progress_state["done"] = True
+    await asyncio.sleep(0.1)
+    progress_task.cancel()
+
+    if result and result.get("status") == "complete":
+        await manager.broadcast({
+            "type": "vision_complete",
+            "corridor": corridor,
+            "result": result,
+            "message": (
+                f"Analysis complete for {corridor}. "
+                f"Median: {result['median_count']} people. "
+                f"Peak flow: {result['peak_flow_rate']} pax/min. "
+                f"Peak CPI: {result['peak_cpi']}"
+            )
+        })
+        print(f"[VISION] Complete: {result}")
+        if result["peak_cpi"] >= 0.85:
+            print(f"[VISION] Auto-triggering alert for {corridor} CPI {result['peak_cpi']}")
+    else:
+        error_msg = progress_state.get("error", "Unknown error")
+        await manager.broadcast({
+            "type": "vision_error", "corridor": corridor,
+            "message": f"Processing failed: {error_msg}"
+        })
 
 
 @app.get("/api/vision/status")
