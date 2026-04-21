@@ -4,7 +4,7 @@
 Tarkshastra is an advanced, real-time Crowd Intelligence and Stampede Prediction System designed to predict crush risks 8–12 minutes ahead for major pilgrimage sites (Ambaji, Dwarka, Somnath, and Pavagadh) in Gujarat. It utilizes a custom **Corridor Pressure Index (CPI)** engine backed by historical crowd observation data to pre-emptively alert specific administrative and transport agencies.
 
 ---
-
+Greate solution but they still can't believe in us
 ## 🎯 The Problem
 Mass gatherings and pilgrimage sites often experience sudden, unpredicted surges in crowd density resulting in chokepoints, stampedes, and casualties. Traditional systems are reactive. There is a critical need for a **proactive** system that can predict chokepoints and provide actionable alerts to respective authorities before a critical threshold is breached.
 
